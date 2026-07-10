@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ORBITAL BOUND: Boss Rush</title>
+  <meta name="description" content="A one-button neon action boss fight game prototype. Orbit, charge, and dash to destroy giant bosses.">
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts for premium typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Game Container holding the Canvas and absolute HUDs -->
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- UI Overlay: Flash Screen for Damage -->
+    <div id="damage-flash"></div>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+      <!-- Player Hearts -->
+      <div id="player-hearts" aria-label="Player health">
+        <span class="heart active">
+          <svg class="heart-svg" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </span>
+        <span class="heart active">
+          <svg class="heart-svg" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </span>
+        <span class="heart active">
+          <svg class="heart-svg" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </span>
+        <span class="heart active">
+          <svg class="heart-svg" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </span>
+        <span class="heart active">
+          <svg class="heart-svg" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </span>
+      </div>
+
+      <!-- Boss HP Container -->
+      <div id="boss-hp-container">
+        <div id="boss-name">THE MECHANICAL EYE</div>
+        <div id="boss-hp-bar-outer">
+          <div id="boss-hp-bar-inner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warning / Attack Banner -->
+    <div id="warning-banner">LASER SWEEP WARNING</div>
+
+    <!-- Screen crack overlay (for Crystal Titan WOW attack) -->
+    <div id="screen-cracks"></div>
+
+    <!-- Menu Overlay (Start / Welcome) -->
+    <div id="menu-overlay" class="overlay active">
+      <div class="overlay-content">
+        <!-- Animated Eclipse/Umbra Visual -->
+        <div class="umbra-eclipse">
+          <div class="corona-ring"></div>
+          <div class="umbra-shadow"></div>
+        </div>
+        
+        <h1 class="game-title">UMBRA</h1>
+        <p class="game-subtitle">ORBITAL BOUND CAMPAIGN</p>
+        
+        <div class="control-help">
+          <p><strong>CONTROLS:</strong> Tap <kbd>SPACEBAR</kbd> or <kbd>LEFT MOUSE CLICK</kbd> to reverse orbit.</p>
+          <p>Hold to freeze & charge. Release to dash and attack the Boss.</p>
+        </div>
+
+        <div class="welcome-action text-blink">
+          CLICK OR PRESS SPACE TO START
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameover-overlay" class="overlay">
+      <div class="overlay-content">
+        <h1 class="text-neon-red">SYSTEM FAIL</h1>
+        <p class="game-subtitle">YOU WERE DESTROYED</p>
+        <p class="countdown-text">REBOOTING IN <span id="gameover-countdown">3</span>...</p>
+      </div>
+    </div>
+
+    <!-- Victory Overlay -->
+    <div id="victory-overlay" class="overlay">
+      <div class="overlay-content">
+        <h1 class="text-neon-cyan">TARGET ELIMINATED</h1>
+        <p class="game-subtitle" id="victory-subtitle">VICTORY ACHIEVED</p>
+        <p class="countdown-text" id="victory-prompt">PROCEEDING IN <span id="victory-countdown">3</span>...</p>
+      </div>
+    </div>
+
+    <!-- Loading Overlay (Initial / Boss Loading) -->
+    <div id="loading-overlay" class="overlay">
+      <div class="overlay-content">
+        <h1 class="game-title" id="loading-title">DOWNLOADING SYSTEM AUDIO</h1>
+        <p class="game-subtitle" id="loading-subtitle">INITIALIZING TELEMETRY LINK...</p>
+        <div class="loading-bar-outer">
+          <div id="loading-bar-inner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sound Notice / Music Enable Modal -->
+    <div id="audio-prompt" class="audio-prompt">
+      <p>🔈 Click anywhere to enable retro synthesized soundtrack & SFX</p>
+    </div>
+
+    <!-- Debug Panel Overlay -->
+    <div id="debug-panel">
+      <h3>DEBUG CONSOLE</h3>
+      <div class="debug-row"><span>Orbit Dir:</span> <span id="debug-dir">CW</span></div>
+      <div class="debug-row"><span>Charge:</span> <span id="debug-charge">0%</span></div>
+      <div class="debug-row"><span>Boss HP:</span> <span id="debug-boss-hp">100/100</span></div>
+      <div class="debug-row"><span>Boss Phase:</span> <span id="debug-boss-phase">Phase 1</span></div>
+      <div class="debug-row"><span>Attack:</span> <span id="debug-attack">Idle</span></div>
+      <div class="debug-row"><span>FPS:</span> <span id="debug-fps">60</span></div>
+      <div class="debug-row"><label><input type="checkbox" id="debug-hitboxes"> Show Hitboxes</label></div>
+      <div class="debug-row">
+        <button id="debug-btn-toggle-boss" style="padding: 2px 5px; font-size: 10px; background: #333; color: #0f0; border: 1px solid #0f0; cursor: pointer;">
+          Switch Boss
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry Script -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

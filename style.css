@@ -1,0 +1,671 @@
+/* ==========================================================================
+   ORBITAL BOUND: Boss Rush - Design System & Styling
+   ========================================================================== */
+
+:root {
+  --bg-color: #07080b;
+  --bg-panel: rgba(13, 15, 23, 0.85);
+  --border-color: rgba(255, 255, 255, 0.08);
+  
+  /* Neon Palette */
+  --neon-cyan: #00f3ff;
+  --neon-red: #ff0055;
+  --neon-orange: #ff9d00;
+  --neon-magenta: #ff00ff;
+  --neon-green: #39ff14;
+  --neon-purple: #9d00ff;
+  
+  /* Glow Filters */
+  --glow-cyan: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.2);
+  --glow-red: 0 0 10px rgba(255, 0, 85, 0.5), 0 0 20px rgba(255, 0, 85, 0.2);
+  --glow-orange: 0 0 10px rgba(255, 157, 0, 0.5), 0 0 20px rgba(255, 157, 0, 0.2);
+  --glow-magenta: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 20px rgba(255, 0, 255, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  background-color: #020204;
+  color: #f0f4f8;
+  font-family: 'Outfit', sans-serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Main Container: Fixed 16:9 Aspect Ratio Game Shell */
+#game-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 1200px;
+  max-height: 675px; /* 16:9 aspect ratio */
+  aspect-ratio: 16 / 9;
+  background-color: var(--bg-color);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.8), 
+              0 0 1px 1px rgba(255, 255, 255, 0.05),
+              0 0 30px rgba(0, 243, 255, 0.03);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Canvas Scales Dynamically */
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ==========================================================================
+   UI Overlays & HUD Elements
+   ========================================================================== */
+
+#hud {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Hearts HP Indicator */
+#player-hearts {
+  display: flex;
+  gap: 8px;
+  filter: drop-shadow(0 2px 8px rgba(255, 0, 85, 0.4));
+}
+
+.heart {
+  font-size: 24px;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+}
+
+.heart.inactive {
+  transform: scale(0.6);
+  opacity: 0.15;
+  filter: grayscale(100%);
+}
+
+.heart.hurt-anim {
+  animation: heartHurt 0.5s ease-out;
+}
+
+@keyframes heartHurt {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.6); }
+  60% { transform: scale(0.4); }
+  100% { transform: scale(0.6); }
+}
+
+/* Boss Health Bar */
+#boss-hp-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 450px; /* Bigger width */
+}
+
+#boss-name {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 16px; /* Bigger font */
+  letter-spacing: 3px;
+  color: #ff3b30;
+  text-shadow: var(--glow-red);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  transition: color 0.5s, text-shadow 0.5s;
+}
+
+#boss-hp-bar-outer {
+  width: 100%;
+  height: 18px; /* Bigger height */
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+#boss-hp-bar-inner {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-red), var(--neon-magenta));
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.9);
+  transition: width 0.2s cubic-bezier(0.1, 0.8, 0.3, 1);
+}
+
+/* Damage Flash and Screens */
+#damage-flash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 0, 85, 0);
+  pointer-events: none;
+  z-index: 50;
+  transition: background-color 0.1s ease-out;
+}
+
+#damage-flash.active {
+  background-color: rgba(255, 0, 85, 0.3);
+}
+
+#screen-cracks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 45;
+  background-size: cover;
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+}
+
+/* ==========================================================================
+   Warning / Announcement Banner
+   ========================================================================== */
+
+#warning-banner {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 4px;
+  color: var(--neon-orange);
+  text-shadow: var(--glow-orange);
+  padding: 10px 40px;
+  background: linear-gradient(90deg, rgba(255,157,0,0), rgba(255,157,0,0.15) 20%, rgba(255,157,0,0.15) 80%, rgba(255,157,0,0));
+  border-top: 1px solid rgba(255, 157, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 157, 0, 0.3);
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#warning-banner.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ==========================================================================
+   Overlay Menus (Start, Game Over, Victory)
+   ========================================================================== */
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(5, 6, 10, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.overlay-content {
+  text-align: center;
+  max-width: 940px; /* Wider container for grid */
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.game-title {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  background: linear-gradient(135deg, var(--neon-cyan), #ffffff, var(--neon-magenta));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 15px rgba(0, 243, 255, 0.4));
+  margin-bottom: 8px;
+  animation: titleGlow 4s infinite alternate;
+}
+
+@keyframes titleGlow {
+  0% { filter: drop-shadow(0 0 10px rgba(0, 243, 255, 0.3)); }
+  100% { filter: drop-shadow(0 0 25px rgba(255, 0, 255, 0.5)); }
+}
+
+.game-subtitle {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 6px;
+  color: #7a829a;
+  margin-bottom: 20px;
+}
+
+.control-help {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a4b3c6;
+  margin-bottom: 20px;
+  max-width: 600px;
+}
+
+.control-help kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--neon-cyan);
+}
+
+/* Boss Selection Cards */
+.boss-selection {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.boss-selection h2 {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: #5d677d;
+  margin-bottom: 12px;
+}
+
+.boss-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 4 columns grid layout */
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+.boss-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 14px; /* Slightly tighter padding for grid density */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  text-align: left;
+  overflow: hidden;
+}
+
+.boss-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.boss-card.active {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-4px);
+}
+
+.boss-card#btn-select-eye.active {
+  border-color: var(--neon-red);
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.2);
+}
+
+.boss-card#btn-select-titan.active {
+  border-color: var(--neon-magenta);
+  box-shadow: 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+.boss-card#btn-select-conductor.active {
+  border-color: var(--neon-orange);
+  box-shadow: 0 0 15px rgba(255, 157, 0, 0.2);
+}
+
+.boss-card#btn-select-phoenix.active {
+  border-color: var(--neon-red);
+  box-shadow: 0 0 15px rgba(255, 51, 0, 0.25);
+}
+
+.boss-card#btn-select-weaver.active {
+  border-color: var(--neon-purple);
+  box-shadow: 0 0 15px rgba(157, 0, 255, 0.25);
+}
+
+.boss-card#btn-select-singularity.active {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.25);
+}
+
+.boss-card#btn-select-cauldron.active {
+  border-color: var(--neon-green);
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.25);
+}
+
+.boss-card-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  opacity: 0.03;
+  pointer-events: none;
+  border-radius: 40%;
+}
+
+.eye-glow {
+  background: radial-gradient(circle, var(--neon-red) 0%, transparent 60%);
+}
+
+.titan-glow {
+  background: radial-gradient(circle, var(--neon-magenta) 0%, transparent 60%);
+}
+
+.conductor-glow {
+  background: radial-gradient(circle, var(--neon-orange) 0%, transparent 60%);
+}
+
+.phoenix-glow {
+  background: radial-gradient(circle, var(--neon-red) 0%, transparent 60%);
+}
+
+.weaver-glow {
+  background: radial-gradient(circle, var(--neon-purple) 0%, transparent 60%);
+}
+
+.singularity-glow {
+  background: radial-gradient(circle, var(--neon-cyan) 0%, transparent 60%);
+}
+
+.cauldron-glow {
+  background: radial-gradient(circle, var(--neon-green) 0%, transparent 60%);
+}
+
+.boss-card.active .boss-card-glow {
+  opacity: 0.08;
+  animation: rotateGlow 10s linear infinite;
+}
+
+@keyframes rotateGlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.boss-card h3 {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  color: #fff;
+}
+
+.boss-card .difficulty {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.difficulty.easy { color: var(--neon-green); }
+.difficulty.medium { color: var(--neon-orange); }
+.difficulty.hard { color: var(--neon-red); }
+
+.boss-card .description {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8c98a9;
+}
+
+/* Styled Button */
+.btn-glow {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: #fff;
+  background: transparent;
+  border: 1px solid var(--neon-cyan);
+  padding: 12px 35px;
+  border-radius: 30px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.15);
+}
+
+.btn-glow:hover {
+  background: var(--neon-cyan);
+  color: #020204;
+  box-shadow: 0 0 25px rgba(0, 243, 255, 0.6);
+  transform: scale(1.05);
+}
+
+/* Game Over / Victory Text colors */
+.text-neon-red {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 10px;
+  color: var(--neon-red);
+  text-shadow: var(--glow-red);
+  margin-bottom: 10px;
+}
+
+.text-neon-cyan {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 10px;
+  color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan);
+  margin-bottom: 10px;
+}
+
+.countdown-text {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #7a829a;
+  margin-top: 20px;
+}
+
+.countdown-text span {
+  font-family: 'Share Tech Mono', monospace;
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+/* Audio Modal */
+.audio-prompt {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 11px;
+  color: #8c98a9;
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 1000;
+  transition: opacity 0.5s;
+}
+
+.audio-prompt.fade-out {
+  opacity: 0;
+}
+
+/* ==========================================================================
+   Debug Overlay Panel
+   ========================================================================== */
+
+#debug-panel {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  background-color: rgba(2, 3, 5, 0.9);
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  width: 180px;
+  z-index: 90;
+  pointer-events: auto;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#debug-panel h3 {
+  font-size: 10px;
+  color: var(--neon-cyan);
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  color: #a4b3c6;
+}
+
+.debug-row span:last-child {
+  color: #ffffff;
+}
+
+.debug-row input[type="checkbox"] {
+  margin-right: 5px;
+  accent-color: var(--neon-cyan);
+}
+
+/* ==========================================================================
+   Campaign Level Progression & One-Button Menu Navigation Styles
+   ========================================================================== */
+
+.welcome-action {
+  margin-top: 40px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan);
+  text-transform: uppercase;
+}
+
+.text-blink {
+  animation: textBlink 1.8s infinite ease-in-out;
+}
+
+@keyframes textBlink {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.25; }
+}
+
+/* Vector SVG Hearts styling */
+.heart-svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: var(--neon-red);
+  filter: drop-shadow(0 0 6px rgba(255, 0, 85, 0.8));
+  transition: fill 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s;
+}
+
+.heart.inactive .heart-svg {
+  fill: rgba(255, 255, 255, 0.07);
+  filter: drop-shadow(0 0 0 transparent);
+}
+
+.loading-bar-outer {
+  width: 320px;
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+  margin-top: 20px;
+}
+
+#loading-bar-inner {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
+  box-shadow: 0 0 8px var(--neon-cyan);
+  transition: width 0.08s ease-out;
+}
+
+/* Animated Eclipse/Umbra Visual */
+.umbra-eclipse {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.corona-ring {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 40%, rgba(0, 243, 255, 0.4) 65%, rgba(255, 0, 85, 0.6) 85%, transparent 100%);
+  filter: blur(8px);
+  box-shadow: 0 0 35px rgba(0, 243, 255, 0.5), 0 0 70px rgba(255, 0, 85, 0.3);
+  animation: coronaPulse 5s infinite ease-in-out alternate;
+}
+
+.umbra-shadow {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #07080b;
+  border: 2px solid rgba(0, 243, 255, 0.25);
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 243, 255, 0.15);
+}
+
+@keyframes coronaPulse {
+  0% { transform: scale(0.96); opacity: 0.75; filter: blur(6px); }
+  100% { transform: scale(1.05); opacity: 1.0; filter: blur(10px); }
+}
+
