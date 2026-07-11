@@ -67,7 +67,6 @@ export class Boss {
     this.visualScale = 1.0;
     
     this.wowAttackTriggered = false;
-    this.recoveryHealsSpawned = false;
     this.telegraphBeepPlayed = false;
   }
 
@@ -82,7 +81,6 @@ export class Boss {
     this.isVulnerable = true;
     this.hitFlashTimer = 0;
     this.wowAttackTriggered = false;
-    this.recoveryHealsSpawned = false;
     this.telegraphBeepPlayed = false;
     this.updateHpUI();
   }
@@ -192,6 +190,16 @@ export class Boss {
     
     // Beat pulse visual scaling dampener
     this.visualScale = lerp(this.visualScale, 1.0, 5 * dt);
+
+    // Play warning sound when getting ready / telegraphing
+    if (this.state === 'TELEGRAPH') {
+      if (!this.telegraphBeepPlayed) {
+        this.telegraphBeepPlayed = true;
+        audio.playWarningBeep();
+      }
+    } else {
+      this.telegraphBeepPlayed = false;
+    }
 
     // Update active bullets
     for (let i = this.bullets.length - 1; i >= 0; i--) {

@@ -53,6 +53,9 @@ export class ClockworkConductor extends Boss {
       'TEMPO_SHIFT', 'RECOVERY'
     ];
     
+    this.maxHp = 450;
+    this.hp = 450;
+    
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
     this.recoveryDuration = 2.0;

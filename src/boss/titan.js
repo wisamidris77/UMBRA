@@ -63,6 +63,9 @@ export class CrystalTitan extends Boss {
       'COMBINED_SPEARS_BOOMERANGS', 'RECOVERY'
     ];
     
+    this.maxHp = 300;
+    this.hp = 300;
+    
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
     this.recoveryDuration = 2.0;

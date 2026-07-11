@@ -52,6 +52,9 @@ export class ShadowWeaver extends Boss {
       'DECOY_SPLIT', 'RECOVERY'
     ];
     
+    this.maxHp = 750;
+    this.hp = 750;
+    
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
     this.recoveryDuration = 2.0;

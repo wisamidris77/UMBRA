@@ -50,6 +50,9 @@ export class VoidSingularity extends Boss {
       'WORMHOLES', 'RECOVERY'
     ];
     
+    this.maxHp = 900;
+    this.hp = 900;
+    
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
     this.recoveryDuration = 2.0;

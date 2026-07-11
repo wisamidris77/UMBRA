@@ -54,6 +54,9 @@ export class SolarPhoenix extends Boss {
       'SOLAR_PROMINENCES', 'RECOVERY'
     ];
     
+    this.maxHp = 600;
+    this.hp = 600;
+    
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
     this.recoveryDuration = 2.0;

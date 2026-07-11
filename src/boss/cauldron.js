@@ -53,6 +53,9 @@ export class AlchemicalCauldron extends Boss {
       'COLOR_SYNTHESIS', 'RECOVERY'
     ];
     
+    this.maxHp = 1100;
+    this.hp = 1100;
+    
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
     this.recoveryDuration = 2.0;

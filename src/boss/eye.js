@@ -32,20 +32,13 @@ export class MechanicalEye extends Boss {
     this.mines = []; // Orbit mines
     this.minesTimer = 0;
     
-    // Sequences
-    this.phase1Sequence = ['LASER_SWEEP', 'RECOVERY', 'TRIPLE_SHOT', 'RECOVERY', 'BROKEN_RING', 'RECOVERY'];
-    this.phase2Sequence = [
-      'LASER_SWEEP', 'RECOVERY', 
-      'TRIPLE_SHOT', 'RECOVERY', 
-      'ORBIT_MINES', 'RECOVERY', 
-      'BROKEN_RING', 'RECOVERY', 
-      'COMBINED_LASER_MINES', 'RECOVERY'
-    ];
-    this.finalSequence = [
-      'WOW_GAZE_OF_DOOM', 'RECOVERY',
-      'COMBINED_MINES_RING', 'RECOVERY',
-      'COMBINED_LASER_MINES', 'RECOVERY'
-    ];
+    // Sequences - Simplified for beginner tutorial level
+    this.phase1Sequence = ['TRIPLE_SHOT', 'RECOVERY'];
+    this.phase2Sequence = ['TRIPLE_SHOT', 'RECOVERY', 'LASER_SWEEP', 'RECOVERY'];
+    this.finalSequence = ['TRIPLE_SHOT', 'RECOVERY', 'LASER_SWEEP', 'RECOVERY', 'ORBIT_MINES', 'RECOVERY'];
+    
+    this.maxHp = 150;
+    this.hp = 150;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -59,11 +52,14 @@ export class MechanicalEye extends Boss {
 
   reset() {
     super.reset();
+    this.hp = this.maxHp;
     this.eyelidClose = 0;
     this.pupilX = 0;
     this.pupilY = 0;
     this.pupilScale = 1.0;
     this.armorPlates = 4;
+    this.currentLaserAngle = 0;
+    this.laserSweepDirection = 1;
     this.laserActive = false;
     this.laserWarning = false;
     this.brokenRingActive = false;
