@@ -188,19 +188,19 @@ export class Boss {
   triggerPhaseTransition(nextPhase, newMaxHp) {
     this.phase = nextPhase;
     
-    if (nextPhase === 2 || nextPhase === 3) {
+    if (nextPhase >= 2) {
       // Use new custom max HP if provided, otherwise default to current maxHp
       this.maxHp = newMaxHp || this.maxHp;
       this.hp = this.maxHp;
       
       // Speed up tempo in Audio Engine
-      audio.setBPM(nextPhase === 3 ? 135 : 120);
+      audio.setBPM(nextPhase >= 3 ? 135 : 120);
       
-      // Reduce cooldown between attacks in phase 2 and 3!
+      // Reduce cooldown between attacks
       this.recoveryDuration = 0.6;
       
       // Interrupt current attack and clean up active hazards!
-      this.state = 'RECOVERY';
+      this.state = 'TRANSITION';
       this.stateTimer = 1.0; // 1 second transition buffer
       this.bullets = [];
       this.activeAttackCleanup();
@@ -307,8 +307,8 @@ export class Boss {
       const b = this.bullets[i];
       b.update(dt);
       
-      // Collision with player
-      if (b.active && player.state !== 'DEAD') {
+      // Collision with player (skip if bullet handles its own collision)
+      if (b.active && player.state !== 'DEAD' && !b.skipCollision) {
         const dist = getDistance(b.x, b.y, player.x, player.y);
         if (dist < b.radius + player.radius) {
           player.takeDamage();

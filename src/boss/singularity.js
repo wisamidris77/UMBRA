@@ -9,6 +9,37 @@ import { lerp, clamp, getDistance, checkCircleLineCollision } from '../utils.js'
 import { particles, screenShake } from '../particle.js';
 import { audio } from '../audio.js';
 
+class GravityRipple {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 40;
+    this.width = 15;
+    this.speed = 180; // Expand rate
+    this.active = true;
+    this.life = 4.0;
+    this.skipCollision = true;
+  }
+  update(dt) {
+    this.radius += this.speed * dt;
+    this.life -= dt;
+    if (this.life <= 0 || this.radius > 800) {
+      this.active = false;
+    }
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(0, 243, 255, ${Math.min(1.0, this.life)})`;
+    ctx.lineWidth = this.width;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00f3ff';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 export class VoidSingularity extends Boss {
   constructor(cx, cy) {
     super(cx, cy, 'THE VOID SINGULARITY', '#00f3ff'); // Neon cyan / dark hole
@@ -18,7 +49,8 @@ export class VoidSingularity extends Boss {
     
     // Orbit warping gravity well
     this.gravityActive = false;
-    this.gravityStrength = 80; // Pull force in pixels/sec
+    this.gravityStrength = 25; // Gentle pull force in pixels/sec
+    this.rippleTimer = 0;
     
     // Spiral disk particles rotation
     this.diskRotation = 0;
@@ -175,9 +207,19 @@ export class VoidSingularity extends Boss {
     this.updateGravityWell(dt, player);
     this.updateWormholes(dt, player);
     this.updateCores(dt, player);
-    
+    // Process collisions for ripples
+    if (player && player.state !== 'DASHING' && player.state !== 'DEAD') {
+      for (let b of this.bullets) {
+        if (b instanceof GravityRipple) {
+          const dist = Math.hypot(player.x - b.x, player.y - b.y);
+          if (Math.abs(dist - b.radius) < b.width / 2 + player.radius) {
+            player.takeDamage();
+          }
+        }
+      }
+    }
+
     this.stateTimer -= dt;
-    
     switch (this.state) {
       case 'IDLE':
         if (this.stateTimer <= 0) {
@@ -367,8 +409,8 @@ export class VoidSingularity extends Boss {
         this.isVulnerable = true;
       }
     } else if (this.targetAttack === 'SINGULARITY_LASER' && this.singularityLaserActive) {
-      // Sweep the giant laser beam 360 degrees
-      this.laserAngle += 1.35 * dt;
+      // Sweep the giant laser beam 360 degrees (Slow and manageable)
+      this.laserAngle += 0.8 * dt;
       
       // Collision check
       if (player.state !== 'DEAD') {
@@ -410,17 +452,26 @@ export class VoidSingularity extends Boss {
   updateGravityWell(dt, player) {
     if (!this.gravityActive || this.state !== 'ATTACK') return;
     
-    // Gravity pulls player orbit radius closer!
-    if (player && player.state === 'ORBITING') {
-      // Pull player in
-      player.orbitRadius = Math.max(120, player.orbitRadius - this.gravityStrength * dt);
+    if (this.phase === 1) {
+      // Gravity pulls player orbit radius closer!
+      if (player && player.state === 'ORBITING') {
+        player.orbitRadius = Math.max(120, player.orbitRadius - this.gravityStrength * dt);
+      }
+    } else {
+      // Phase 2 & 3: Gravity spawns expanding ripples that players dash through
+      this.rippleTimer -= dt;
+      if (this.rippleTimer <= 0) {
+        this.rippleTimer = 0.5;
+        this.bullets.push(new GravityRipple(this.cx, this.cy));
+        audio.playWaveSpawn();
+      }
     }
   }
 
   // Smoothly restore player's orbit radius during recovery/other states
   updateGravityWellRecovery(dt, player) {
-    if (player && player.orbitRadius !== 220) {
-      player.orbitRadius = lerp(player.orbitRadius, 220, 3 * dt);
+    if (player && player.orbitRadius !== player.defaultOrbitRadius) {
+      player.orbitRadius = lerp(player.orbitRadius, player.defaultOrbitRadius, 3 * dt);
     }
   }
 

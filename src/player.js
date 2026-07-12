@@ -12,7 +12,8 @@ export class Player {
   constructor(cx, cy) {
     this.cx = cx; // center X (boss position)
     this.cy = cy; // center Y (boss position)
-    this.orbitRadius = 220;
+    this.defaultOrbitRadius = 220;
+    this.orbitRadius = this.defaultOrbitRadius;
     
     this.x = cx;
     this.y = cy - this.orbitRadius;
@@ -118,9 +119,9 @@ export class Player {
 
   reset() {
     this.hp = this.maxHp;
-    this.theta = -Math.PI / 2;
-    this.orbitDir = 1;
     this.state = 'ORBITING';
+    this.orbitRadius = this.defaultOrbitRadius;
+    this.theta = -Math.PI / 2;
     this.chargeTime = 0;
     this.chargePercent = 0;
     this.invincibilityTime = 0;
@@ -245,14 +246,25 @@ export class Player {
     
     // Main state machine
     switch (this.state) {
-      case 'ORBITING':
-        // Orbit rotation: angle increases/decreases based on direction
+      case 'ORBITING': {
         const currentSpeed = (window.gameAppInstance && window.gameAppInstance.superDebugActive) 
           ? this.orbitSpeed * 4 
           : this.orbitSpeed;
-        this.theta += this.orbitDir * currentSpeed * dt;
+        
+        let speedMult = 1.0;
+        const currentBoss = window.gameAppInstance?.boss;
+        if (currentBoss && currentBoss.gravityFlicker) {
+          // Oscillate player speed dynamically between 0.3x and 1.8x
+          speedMult = 1.05 + Math.sin(performance.now() * 0.005) * 0.75;
+        }
+        
+        // Smoothly return player to their target default orbit radius
+        this.orbitRadius = lerp(this.orbitRadius, this.defaultOrbitRadius, 5 * dt);
+        
+        this.theta += this.orbitDir * currentSpeed * dt * speedMult;
         this.updatePosition();
         break;
+      }
         
       case 'CHARGING':
         if (window.gameAppInstance && window.gameAppInstance.superDebugActive) {

@@ -8,7 +8,6 @@ import { Player } from './player.js';
 import { MechanicalEye } from './boss/eye.js';
 import { CrystalTitan } from './boss/titan.js';
 import { ClockworkConductor } from './boss/conductor.js';
-import { ShadowWeaver } from './boss/weaver.js';
 import { VoidSingularity } from './boss/singularity.js';
 import { Sigma } from './boss/sigma.js';
 import { audio } from './audio.js';
@@ -96,7 +95,6 @@ class GameApp {
     this.bossEye = null;
     this.bossTitan = null;
     this.bossConductor = null;
-    this.bossWeaver = null;
     this.bossSingularity = null;
     this.bossSigma = null;
     this.chest = null;
@@ -135,7 +133,6 @@ class GameApp {
     this.bossEye = new MechanicalEye(this.cx, this.cy);
     this.bossTitan = new CrystalTitan(this.cx, this.cy);
     this.bossConductor = new ClockworkConductor(this.cx, this.cy);
-    this.bossWeaver = new ShadowWeaver(this.cx, this.cy);
     this.bossSingularity = new VoidSingularity(this.cx, this.cy);
     this.bossSigma = new Sigma(this.cx, this.cy);
     
@@ -171,7 +168,7 @@ class GameApp {
 
   loadJourney() {
     this.currentLevel = parseInt(localStorage.getItem('orbital_bound_campaign_level') || '1', 10);
-    if (isNaN(this.currentLevel) || this.currentLevel < 1 || this.currentLevel > 6) {
+    if (isNaN(this.currentLevel) || this.currentLevel < 1 || this.currentLevel > 5) {
       this.currentLevel = 1;
     }
     try {
@@ -188,14 +185,15 @@ class GameApp {
     if (level === 1) this.boss = this.bossEye;
     else if (level === 2) this.boss = this.bossTitan;
     else if (level === 3) this.boss = this.bossConductor;
-    else if (level === 4) this.boss = this.bossWeaver;
-    else if (level === 5) this.boss = this.bossSingularity;
-    else if (level === 6) this.boss = this.bossSigma;
+    else if (level === 4) this.boss = this.bossSingularity;
+    else if (level === 5) this.boss = this.bossSigma;
 
-    const sectorSelect = document.getElementById('debug-sector-select');
-    if (sectorSelect) {
-      sectorSelect.value = level.toString();
+    if (this.player) {
+      this.player.defaultOrbitRadius = (level === 5) ? 250 : 220;
+      this.player.reset();
     }
+
+
     
     const menuSectorSelect = document.getElementById('menu-sector-select');
     if (menuSectorSelect) {
@@ -260,7 +258,13 @@ class GameApp {
     };
 
     const trackUrl = `soundtracks/level${level}.mp3`;
-    audio.loadAudioFile(trackUrl)
+    const loadPromises = [audio.loadAudioFile(trackUrl)];
+    if (level === 5) {
+      loadPromises.push(audio.loadAudioFile('soundtracks/level6.mp3'));
+      loadPromises.push(audio.loadAudioFile('soundtracks/level7.mp3'));
+    }
+
+    Promise.all(loadPromises)
       .then(() => {
         setTimeout(() => {
           if (loadingOverlay) loadingOverlay.classList.remove('active');
@@ -268,7 +272,7 @@ class GameApp {
         }, 300);
       })
       .catch((err) => {
-        console.error("Failed to load boss audio: " + trackUrl, err);
+        console.error("Failed to load boss audio for level " + level, err);
         if (loadingOverlay) loadingOverlay.classList.remove('active');
         onComplete();
       });
@@ -327,37 +331,7 @@ class GameApp {
     };
 
     // Keyboard bindings
-    let debugSequence = '';
-    let killSequence = '';
     window.addEventListener('keydown', (e) => {
-      const key = e.key.toLowerCase();
-      
-      // Trace cheat sequence: lkj (insta charge)
-      if (['l', 'k', 'j'].includes(key)) {
-        debugSequence += key;
-        if (debugSequence.endsWith('lkjlkjlkj')) {
-          this.toggleSuperDebugCheat();
-          debugSequence = '';
-        }
-      } else {
-        debugSequence = '';
-      }
-
-      // Trace cheat sequence: mnb (instant kill boss)
-      if (['m', 'n', 'b'].includes(key)) {
-        killSequence += key;
-        if (killSequence.endsWith('mnbmnbmnbmnbmnb')) {
-          if (this.state === 'PLAYING' && this.boss && this.boss.state !== 'DEAD') {
-            this.boss.takeDamage(9999);
-            audio.playBossExplode();
-            particles.spawnExplosion(this.boss.cx, this.boss.cy, '#ff0033', 50, 15);
-          }
-          killSequence = '';
-        }
-      } else {
-        killSequence = '';
-      }
-
       if (e.code === 'Space') {
         e.preventDefault();
         
@@ -433,7 +407,6 @@ class GameApp {
     playArea.addEventListener('mousedown', (e) => {
       // Ignore clicks on menus, debug buttons, sliders, or action panels
       if (e.button !== 0 || 
-          e.target.closest('#debug-panel') || 
           e.target.closest('.settings-panel') || 
           e.target.closest('.pause-hud-btn') || 
           e.target.closest('.pause-actions')) return;
@@ -445,7 +418,7 @@ class GameApp {
     if (menuOverlayEl) {
       menuOverlayEl.addEventListener('mousedown', (e) => {
         if (this.state === 'MENU') {
-          if (!e.target.closest('.settings-panel') && !e.target.closest('.control-help') && !e.target.closest('.menu-sector-picker-container')) {
+          if (!e.target.closest('.settings-panel') && !e.target.closest('.control-help')) {
             e.stopPropagation();
             this.enableAudioContext();
             this.startGame();
@@ -460,8 +433,7 @@ class GameApp {
 
     // Touch support for mobile devices
     playArea.addEventListener('touchstart', (e) => {
-      if (e.target.closest('#debug-panel') || 
-          e.target.closest('.settings-panel') || 
+      if (e.target.closest('.settings-panel') || 
           e.target.closest('.pause-hud-btn') || 
           e.target.closest('.pause-actions')) return;
       e.preventDefault();
@@ -472,44 +444,8 @@ class GameApp {
       handleRelease(e);
     });
 
-    // Debug sector selector dropdown
-    const sectorSelect = document.getElementById('debug-sector-select');
-    if (sectorSelect) {
-      sectorSelect.addEventListener('change', (e) => {
-        const selectedLvl = parseInt(e.target.value);
-        this.setLevelBoss(selectedLvl);
-        if (this.state === 'PLAYING' || this.state === 'CHEST_LOOT' || this.state === 'GAMEOVER') {
-          this.state = 'PLAYING';
-          this.startGame();
-        }
-      });
-      sectorSelect.value = this.currentLevel.toString();
-    }
 
-    // Welcome start menu sector selector dropdown
-    const menuSectorSelect = document.getElementById('menu-sector-select');
-    if (menuSectorSelect) {
-      menuSectorSelect.addEventListener('change', (e) => {
-        const selectedLvl = parseInt(e.target.value);
-        this.setLevelBoss(selectedLvl);
-      });
-      menuSectorSelect.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-      });
-      menuSectorSelect.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-      menuSectorSelect.value = this.currentLevel.toString();
-    }
-    const menuPickerContainer = document.querySelector('.menu-sector-picker-container');
-    if (menuPickerContainer) {
-      menuPickerContainer.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-      });
-      menuPickerContainer.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    }
+
 
     // Volume Control Sliders
     const musicVolSlider = document.getElementById('music-volume');
@@ -775,12 +711,12 @@ class GameApp {
     this.selectedUpgrade = null;
     document.getElementById('loot-overlay').classList.remove('active');
     
-    if (this.currentLevel < 6) {
+    if (this.currentLevel < 5) {
       this.setLevelBoss(this.currentLevel + 1);
       this.saveJourney();
       this.startGame();
     } else {
-      // Finished all 6 levels
+      // Finished all 5 levels
       this.setLevelBoss(1);
       this.upgrades = {}; // reset upgrades for new campaign run
       this.saveJourney();
@@ -1415,7 +1351,7 @@ class GameApp {
     const subtitleEl = document.getElementById('victory-subtitle');
     const promptEl = document.getElementById('victory-prompt');
     
-    if (this.currentLevel === 6) {
+    if (this.currentLevel === 5) {
       if (titleEl) titleEl.textContent = "CAMPAIGN COMPLETE";
       if (subtitleEl) subtitleEl.textContent = "YOU CONQUERED ALL THREATS!";
       if (promptEl) promptEl.innerHTML = "REBOOTING CAMPAIGN IN <span id='victory-countdown'>3</span>...";
@@ -1512,7 +1448,7 @@ class GameApp {
         
         // Check victory conditions
         if (this.boss.state === 'DEAD' && this.boss.stateTimer <= 0) {
-          if (this.currentLevel === 6) {
+          if (this.currentLevel === 5) {
             this.triggerEndingStory();
           } else {
             this.spawnTreasureChest();
@@ -1583,7 +1519,8 @@ class GameApp {
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
     this.ctx.lineWidth = 1;
     this.ctx.beginPath();
-    this.ctx.arc(this.cx, this.cy, 220, 0, Math.PI * 2); // player orbit path indicator
+    const bgOrbitRadius = this.player ? this.player.defaultOrbitRadius : 220;
+    this.ctx.arc(this.cx, this.cy, bgOrbitRadius, 0, Math.PI * 2); // player orbit path indicator
     this.ctx.stroke();
     this.ctx.restore();
     

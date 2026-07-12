@@ -447,6 +447,68 @@ class AudioEngine {
     this.beatIntervalId = setInterval(tick, intervalMs);
   }
 
+  crossfadeTrack(url, bpm, fadeDuration = 2.0) {
+    this.init();
+    
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.pendingTrack = { url, bpm };
+      return;
+    }
+    
+    const buffer = this.loadedBuffers[url];
+    if (!buffer) {
+      console.warn("Audio buffer not loaded in advance: " + url);
+      return;
+    }
+    
+    // Fade out current track
+    const oldSource = this.musicSource;
+    const oldGain = this.musicGain;
+    
+    // Create new music gain and source
+    const newGain = this.ctx.createGain();
+    newGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    newGain.gain.linearRampToValueAtTime(this.musicVolume, this.ctx.currentTime + fadeDuration);
+    newGain.connect(this.masterGain);
+    
+    if (oldSource && oldGain) {
+      oldGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      oldGain.gain.setValueAtTime(oldGain.gain.value, this.ctx.currentTime);
+      oldGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + fadeDuration);
+      
+      setTimeout(() => {
+        try { oldSource.stop(); } catch(e) {}
+        oldGain.disconnect();
+      }, fadeDuration * 1000 + 100);
+    }
+    
+    this.musicGain = newGain; // replace current musicGain reference
+    
+    this.bpm = bpm;
+    this.isPlayingMusic = true;
+    
+    this.musicSource = this.ctx.createBufferSource();
+    this.musicSource.buffer = buffer;
+    this.musicSource.loop = true;
+    this.musicSource.connect(this.musicGain);
+    this.musicSource.start(0);
+    
+    // restart beat tracking
+    if (this.beatIntervalId) {
+      clearInterval(this.beatIntervalId);
+    }
+    let beat = 0;
+    const intervalMs = (60.0 / bpm) * 1000;
+    const tick = () => {
+      if (!this.isPlayingMusic) return;
+      const now = this.ctx.currentTime;
+      this.triggerBeatEvent(now);
+      beat = (beat + 1) % 16;
+    };
+    tick();
+    this.beatIntervalId = setInterval(tick, intervalMs);
+  }
+
   stopMusic() {
     this.isPlayingMusic = false;
     if (this.musicSource) {
