@@ -5,7 +5,7 @@
  */
 
 import { Boss } from './boss.js';
-import { lerp, clamp, getDistance } from '../utils.js';
+import { lerp, clamp, getDistance, checkCircleLineCollision } from '../utils.js';
 import { particles, screenShake } from '../particle.js';
 import { audio } from '../audio.js';
 
@@ -34,21 +34,27 @@ export class VoidSingularity extends Boss {
     this.phase1Sequence = [
       'EVENT_HORIZON_SPIRAL', 'RECOVERY',
       'GRAVITY_WELL', 'RECOVERY',
-      'WORMHOLES', 'RECOVERY'
+      'EVENT_HORIZON_SPIRAL', 'RECOVERY',
+      'GRAVITY_WELL', 'RECOVERY'
     ];
     
     this.phase2Sequence = [
-      'GRAVITY_WELL', 'RECOVERY',
-      'EVENT_HORIZON_SPIRAL', 'RECOVERY',
+      'SINGULARITY_LASER', 'RECOVERY',
       'WORMHOLES', 'RECOVERY',
-      'COMBINED_GRAVITY_SPIRAL', 'RECOVERY'
+      'COMBINED_GRAVITY_SPIRAL', 'RECOVERY',
+      'EVENT_HORIZON_SPIRAL', 'RECOVERY',
+      'SINGULARITY_LASER', 'RECOVERY'
     ];
     
-    this.finalSequence = [
+    this.phase3Sequence = [
       'WOW_BIG_BANG', 'RECOVERY',
+      'GRAVITY_PULSAR', 'RECOVERY',
+      'SINGULARITY_LASER', 'RECOVERY',
       'COMBINED_GRAVITY_SPIRAL', 'RECOVERY',
       'WORMHOLES', 'RECOVERY'
     ];
+    
+    this.finalSequence = [];
     
     this.maxHp = 200;
     this.hp = 200;
@@ -67,6 +73,12 @@ export class VoidSingularity extends Boss {
     this.wormholes = [];
     this.coresActive = false;
     this.cores = [];
+    this.singularityLaserActive = false;
+    this.laserAngle = 0;
+    this.gravityPulsarActive = false;
+    this.pulsarTimer = 0;
+    this.warpX = 0;
+    this.warpY = 0;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -104,17 +116,24 @@ export class VoidSingularity extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 50) { // 25% of 200 maxHp
-      this.triggerPhaseTransition(2, 120); // Phase 2 has 120 HP
+    if (this.phase === 1 && this.hp <= 66) { // 33% of 200
+      this.triggerPhaseTransition(2, 180); // Phase 2 has 180 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
       this.color = '#ff9d00'; // Color turns to active event horizon orange!
+    } else if (this.phase === 2 && this.hp <= 54) { // 30% of 180
+      this.triggerPhaseTransition(3, 240); // Phase 3 has 240 HP
+      this.activeSequence = this.phase3Sequence;
+      this.sequenceIndex = 0;
+      this.color = '#ff0033'; // Color turns to collapsing void crimson!
     }
   }
 
   activeAttackCleanup() {
     this.gravityActive = false;
     this.wormholes = [];
+    this.singularityLaserActive = false;
+    this.gravityPulsarActive = false;
     const banner = document.getElementById('warning-banner');
     if (banner) banner.classList.remove('active');
   }
@@ -258,6 +277,38 @@ export class VoidSingularity extends Boss {
           banner.classList.add('active');
         }
         break;
+
+      case 'SINGULARITY_LASER':
+        this.stateTimer = 1.0; // 1s warning
+        this.singularityLaserActive = false;
+        
+        // Target warning line at player angle
+        let pAngLaser = 0;
+        const playerL = window.gameAppInstance?.player;
+        if (playerL) {
+          pAngLaser = Math.atan2(playerL.y - this.cy, playerL.x - this.cx);
+        }
+        this.laserAngle = pAngLaser;
+        
+        if (banner) {
+          banner.textContent = "🌌 VOID BEAM LOCKED 🌌";
+          banner.style.color = '#ff0055';
+          banner.style.textShadow = '0 0 10px #ff0055';
+          banner.classList.add('active');
+        }
+        break;
+
+      case 'GRAVITY_PULSAR':
+        this.stateTimer = 1.0;
+        this.gravityPulsarActive = false;
+        this.pulsarTimer = 0;
+        if (banner) {
+          banner.textContent = "🌌 COSMIC PULSAR ACTIVE 🌌";
+          banner.style.color = '#ff9d00';
+          banner.style.textShadow = '0 0 10px #ff9d00';
+          banner.classList.add('active');
+        }
+        break;
     }
   }
 
@@ -288,6 +339,16 @@ export class VoidSingularity extends Boss {
       case 'WOW_BIG_BANG':
         this.stateTimer = 5.0; // 5s to destroy cores before supernova!
         break;
+
+      case 'SINGULARITY_LASER':
+        this.stateTimer = 4.0;
+        this.singularityLaserActive = true;
+        break;
+
+      case 'GRAVITY_PULSAR':
+        this.stateTimer = 5.0;
+        this.gravityPulsarActive = true;
+        break;
     }
   }
 
@@ -305,6 +366,31 @@ export class VoidSingularity extends Boss {
         this.cores = [];
         this.isVulnerable = true;
       }
+    } else if (this.targetAttack === 'SINGULARITY_LASER' && this.singularityLaserActive) {
+      // Sweep the giant laser beam 360 degrees
+      this.laserAngle += 1.35 * dt;
+      
+      // Collision check
+      if (player.state !== 'DEAD') {
+        const lx = this.cx + Math.cos(this.laserAngle) * 500;
+        const ly = this.cy + Math.sin(this.laserAngle) * 500;
+        if (checkCircleLineCollision(player.x, player.y, player.radius, this.cx, this.cy, lx, ly)) {
+          player.takeDamage();
+        }
+      }
+    } else if (this.targetAttack === 'GRAVITY_PULSAR' && this.gravityPulsarActive) {
+      this.pulsarTimer += dt;
+      if (this.pulsarTimer >= 0.8) {
+        this.pulsarTimer = 0;
+        screenShake.trigger(10, 0.25);
+        particles.spawnExplosion(this.cx, this.cy, this.color, 15, 4);
+        
+        if (player.state !== 'DEAD') {
+          const pulseDirection = Math.random() < 0.5 ? 1 : -1;
+          player.orbitSpeed += pulseDirection * 0.95;
+          player.orbitSpeed = Math.max(-4.5, Math.min(4.5, player.orbitSpeed));
+        }
+      }
     }
   }
 
@@ -314,6 +400,8 @@ export class VoidSingularity extends Boss {
     this.cores = [];
     this.isVulnerable = true;
     this.wormholes = [];
+    this.singularityLaserActive = false;
+    this.gravityPulsarActive = false;
     
     this.state = 'RECOVERY';
     this.stateTimer = this.recoveryDuration;
@@ -582,21 +670,68 @@ export class VoidSingularity extends Boss {
     ctx.stroke();
     
     // Draw event horizon border details
-    ctx.strokeStyle = this.phase === 2 ? 'rgba(255, 157, 0, 0.6)' : 'rgba(0, 243, 255, 0.6)';
+    ctx.strokeStyle = this.phase === 3 ? 'rgba(255, 0, 51, 0.6)' : (this.phase === 2 ? 'rgba(255, 157, 0, 0.6)' : 'rgba(0, 243, 255, 0.6)');
     ctx.lineWidth = 2.0;
     ctx.beginPath();
     ctx.arc(this.cx, this.cy, dynamicRadius * 0.95, 0, Math.PI * 2);
     ctx.stroke();
     
-    // Draw Warped Event Horizon accretion disk in Phase 2 (Glow warp!)
-    if (this.phase === 2) {
+    // Draw Warped Event Horizon accretion disk in Phase 2/3 (Glow warp!)
+    if (this.phase >= 2) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(255, 157, 0, 0.4)';
+      const warpColor = this.phase === 3 ? '#ff0033' : '#ff9d00';
+      ctx.strokeStyle = warpColor;
       ctx.lineWidth = 3.5;
       ctx.shadowBlur = 15;
-      ctx.shadowColor = '#ff9d00';
+      ctx.shadowColor = warpColor;
       ctx.beginPath();
       ctx.ellipse(this.cx, this.cy, dynamicRadius * 1.5, dynamicRadius * 0.45, Date.now() * 0.002, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw Singularity Laser warning / active beam
+    if (this.targetAttack === 'SINGULARITY_LASER') {
+      ctx.save();
+      if (this.state === 'TELEGRAPH') {
+        ctx.strokeStyle = 'rgba(255, 0, 85, 0.45)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        ctx.moveTo(this.cx, this.cy);
+        ctx.lineTo(this.cx + Math.cos(this.laserAngle) * 500, this.cy + Math.sin(this.laserAngle) * 500);
+        ctx.stroke();
+      } else if (this.state === 'ATTACK' && this.singularityLaserActive) {
+        ctx.strokeStyle = '#ff0055';
+        ctx.lineWidth = 12;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff0055';
+        ctx.beginPath();
+        ctx.moveTo(this.cx, this.cy);
+        ctx.lineTo(this.cx + Math.cos(this.laserAngle) * 500, this.cy + Math.sin(this.laserAngle) * 500);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(this.cx, this.cy);
+        ctx.lineTo(this.cx + Math.cos(this.laserAngle) * 500, this.cy + Math.sin(this.laserAngle) * 500);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Draw gravity pulsar shockwave pulses
+    if (this.gravityPulsarActive && this.state === 'ATTACK') {
+      ctx.save();
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = this.color;
+      
+      const pulseRadius = (Date.now() % 800 / 800) * 240;
+      ctx.beginPath();
+      ctx.arc(this.cx, this.cy, pulseRadius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }

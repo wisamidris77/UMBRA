@@ -94,10 +94,9 @@
                 <option value="1">Sector 1: Mechanical Eye</option>
                 <option value="2">Sector 2: Crystal Titan</option>
                 <option value="3">Sector 3: Clockwork Conductor</option>
-                <option value="4">Sector 4: Solar Phoenix</option>
-                <option value="5">Sector 5: Shadow Weaver</option>
-                <option value="6">Sector 6: Void Singularity</option>
-                <option value="7">Sector 7: Alchemical Cauldron</option>
+                <option value="4">Sector 4: Shadow Weaver</option>
+                <option value="5">Sector 5: Void Singularity</option>
+                <option value="6">Sector 6: Sigma</option>
               </select>
             </div>
           </div>
@@ -177,6 +176,37 @@
       </div>
     </div>
 
+    <!-- Story Credits & Scroll Overlay -->
+    <div id="story-overlay" class="overlay">
+      <div class="story-container">
+        <!-- Part 1: Minecraft Scroll Conversation -->
+        <div id="story-dialogue-screen" class="story-screen active">
+          <div id="dialogue-log" class="dialogue-log-scroll"></div>
+          <div id="dialogue-choices" class="dialogue-choices-area"></div>
+          <div id="dialogue-hold-container" style="display: none; flex-direction: column; align-items: center; margin-top: 15px;">
+            <div style="width: 180px; height: 5px; background: rgba(255, 255, 255, 0.05); border-radius: 2px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);">
+              <div id="dialogue-hold-bar-inner" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta)); box-shadow: 0 0 8px var(--neon-cyan); transition: width 0.05s linear;"></div>
+            </div>
+            <p style="font-size: 8px; opacity: 0.6; margin-top: 6px; font-family: 'Share Tech Mono', monospace; letter-spacing: 1px; text-transform: uppercase;">
+              [SPACE] Cycle Answer &bull; Hold [SPACE] to Confirm
+            </p>
+          </div>
+        </div>
+
+        <!-- Part 2: Flashing Geometry Art Card Screen -->
+        <div id="story-geometry-screen" class="story-screen">
+          <div class="geometry-card-container">
+            <canvas id="geometry-canvas" width="400" height="400"></canvas>
+            <div class="geometry-text-container">
+              <div id="geometry-card-title" class="geometry-title text-neon-cyan">THE SINGULARITY</div>
+              <p id="geometry-card-body" class="geometry-body">...</p>
+              <div id="geometry-card-prompt" class="geometry-prompt">[ PRESS SPACEBAR TO ADVANCE ]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Pause Overlay -->
     <div id="pause-overlay" class="overlay">
       <div class="overlay-content">
@@ -249,10 +279,9 @@
           <option value="1">Sector 1: Eye</option>
           <option value="2">Sector 2: Titan</option>
           <option value="3">Sector 3: Conductor</option>
-          <option value="4">Sector 4: Phoenix</option>
-          <option value="5">Sector 5: Weaver</option>
-          <option value="6">Sector 6: Singularity</option>
-          <option value="7">Sector 7: Cauldron</option>
+          <option value="4">Sector 4: Weaver</option>
+          <option value="5">Sector 5: Singularity</option>
+          <option value="6">Sector 6: Sigma</option>
         </select>
       </div>
     </div>

@@ -5,7 +5,7 @@
  */
 
 import { Boss } from './boss.js';
-import { lerp, clamp, getDistance } from '../utils.js';
+import { lerp, clamp, getDistance, checkCircleLineCollision } from '../utils.js';
 import { particles, screenShake } from '../particle.js';
 import { audio } from '../audio.js';
 
@@ -38,21 +38,27 @@ export class SolarPhoenix extends Boss {
     this.phase1Sequence = [
       'ASH_FLARES', 'RECOVERY',
       'SOLAR_PROMINENCES', 'RECOVERY',
-      'STELLAR_WIND', 'RECOVERY'
+      'STELLAR_WIND', 'RECOVERY',
+      'ASH_FLARES', 'RECOVERY'
     ];
     
     this.phase2Sequence = [
-      'SOLAR_PROMINENCES', 'RECOVERY',
+      'CORONAL_EJECTION', 'RECOVERY',
+      'SOLAR_DIVE', 'RECOVERY',
+      'COMBINED_WIND_FLARES', 'RECOVERY',
       'ASH_FLARES', 'RECOVERY',
-      'STELLAR_WIND', 'RECOVERY',
-      'COMBINED_WIND_FLARES', 'RECOVERY'
+      'CORONAL_EJECTION', 'RECOVERY'
     ];
     
-    this.finalSequence = [
+    this.phase3Sequence = [
       'WOW_SUPERNOVA', 'RECOVERY',
+      'CORONAL_EJECTION', 'RECOVERY',
+      'SOLAR_DIVE', 'RECOVERY',
       'COMBINED_WIND_FLARES', 'RECOVERY',
       'SOLAR_PROMINENCES', 'RECOVERY'
     ];
+    
+    this.finalSequence = [];
     
     this.maxHp = 160;
     this.hp = 160;
@@ -73,6 +79,10 @@ export class SolarPhoenix extends Boss {
     this.ashFlares = [];
     this.stellarWindActive = false;
     this.windDirection = 1;
+    this.coronalLaserActive = false;
+    this.laserAngle = 0;
+    this.burningTrails = [];
+    this.diveActive = false;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -145,12 +155,18 @@ export class SolarPhoenix extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 40) { // 25% of 160 maxHp
-      this.triggerPhaseTransition(2, 100); // Phase 2 has 100 HP (climax!)
+    if (this.phase === 1 && this.hp <= 53) { // 33% of 160
+      this.triggerPhaseTransition(2, 140); // Phase 2 has 140 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-      this.shieldSpeed = 2.0; // rotate faster!
+      this.shieldSpeed = 1.8;
       this.color = '#00f3ff'; // Color turns to solar supernova cyan!
+    } else if (this.phase === 2 && this.hp <= 42) { // 30% of 140
+      this.triggerPhaseTransition(3, 200); // Phase 3 has 200 HP
+      this.activeSequence = this.phase3Sequence;
+      this.sequenceIndex = 0;
+      this.shieldSpeed = 2.4;
+      this.color = '#ff3300'; // Color turns to extreme coronal red!
     }
   }
 
@@ -158,6 +174,10 @@ export class SolarPhoenix extends Boss {
     this.prominences = [];
     this.ashFlares = [];
     this.stellarWindActive = false;
+    this.coronalLaserActive = false;
+    this.diveActive = false;
+    this.cx = 480;
+    this.cy = 270;
     const banner = document.getElementById('warning-banner');
     if (banner) banner.classList.remove('active');
   }
@@ -200,6 +220,8 @@ export class SolarPhoenix extends Boss {
     this.updateProminences(dt, player);
     this.updateAshFlares(dt, player);
     this.updateStellarWind(dt, player);
+    this.updateCoronalLaser(dt, player);
+    this.updateSolarDive(dt, player);
     
     this.stateTimer -= dt;
     
@@ -292,8 +314,65 @@ export class SolarPhoenix extends Boss {
         }
         break;
 
+      case 'CORONAL_EJECTION':
+        this.stateTimer = 1.0; // 1s warning
+        this.coronalLaserActive = false;
+        
+        // Find player angle to target the beam warning line
+        let pAngLaser = 0;
+        const playerL = window.gameAppInstance?.player;
+        if (playerL) {
+          pAngLaser = Math.atan2(playerL.y - this.cy, playerL.x - this.cx);
+        }
+        this.laserAngle = pAngLaser;
+        this.burningTrails = []; // { angle: 0, life: 2.0 }
+        
+        if (banner) {
+          banner.textContent = "🔥 CORONAL BEAM LOCKED 🔥";
+          banner.style.color = '#ff9d00';
+          banner.style.textShadow = '0 0 10px #ff9d00';
+          banner.classList.add('active');
+        }
+        break;
+
+      case 'SOLAR_DIVE':
+        this.stateTimer = 1.2; // warning
+        this.diveActive = false;
+        
+        // Target player position
+        const pElDive = window.gameAppInstance?.player;
+        if (pElDive) {
+          this.diveTargetX = pElDive.x;
+          this.diveTargetY = pElDive.y;
+        } else {
+          this.diveTargetX = 480;
+          this.diveTargetY = 270;
+        }
+        
+        if (banner) {
+          banner.textContent = "🔥 THERMAL DIVE DETECTED 🔥";
+          banner.style.color = '#ff3300';
+          banner.style.textShadow = '0 0 15px #ff3300';
+          banner.classList.add('active');
+        }
+        break;
+
       case 'WOW_SUPERNOVA':
         this.stateTimer = 1.5; // Long telegraph warning
+        
+        // Find player position and target safety zone close to player
+        let pAngle = 0;
+        const pEl = window.gameAppInstance?.player;
+        if (pEl) {
+          pAngle = Math.atan2(pEl.y - this.cy, pEl.x - this.cx);
+        } else {
+          pAngle = Math.random() * Math.PI * 2;
+        }
+        const sOffset = (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.25);
+        this.prominences = [
+          { radius: 220, angle: pAngle + sOffset, width: 1.25, speed: 0.65 * (Math.random() < 0.5 ? 1 : -1), state: 'TELEGRAPH_WOW' }
+        ];
+
         if (banner) {
           banner.textContent = "⚠️ THERMONUCLEAR EXPLOSION: HIDE! ⚠️";
           banner.style.color = '#ff0000';
@@ -331,17 +410,25 @@ export class SolarPhoenix extends Boss {
         
       case 'WOW_SUPERNOVA':
         this.stateTimer = 2.0; // explode for 2s
-        // Create the circular moving solar flare shields to hide behind
-        this.prominences = [
-          { radius: 220, angle: Math.random() * Math.PI * 2, width: 1.0, speed: 0.8, state: 'WOW_EXPLODE' }
-        ];
+        if (this.prominences.length > 0) {
+          this.prominences[0].state = 'WOW_EXPLODE';
+        }
+        break;
+
+      case 'CORONAL_EJECTION':
+        this.stateTimer = 4.0;
+        this.coronalLaserActive = true;
+        break;
+
+      case 'SOLAR_DIVE':
+        this.stateTimer = 1.0;
+        this.diveActive = true;
         break;
     }
   }
 
   finishAttack() {
-    this.prominences = [];
-    this.stellarWindActive = false;
+    this.activeAttackCleanup();
     this.state = 'RECOVERY';
     this.stateTimer = this.recoveryDuration;
   }
@@ -533,6 +620,19 @@ export class SolarPhoenix extends Boss {
         ctx.arc(this.cx, this.cy, p.radius, start, end);
         ctx.stroke();
         
+      } else if (p.state === 'TELEGRAPH_WOW') {
+        // Draw early warning indicator for the safety zone
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.65)';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00f3ff';
+        ctx.setLineDash([5, 8]);
+        ctx.beginPath();
+        const start = p.angle - p.width / 2;
+        const end = p.angle + p.width / 2;
+        ctx.arc(this.cx, this.cy, p.radius, start, end);
+        ctx.stroke();
+        ctx.restore();
       } else {
         // Standard loops
         ctx.strokeStyle = p.state === 'TELEGRAPH' ? 'rgba(255, 51, 0, 0.45)' : '#ff3300';
@@ -690,6 +790,114 @@ export class SolarPhoenix extends Boss {
     ctx.arc(this.cx, this.cy, dynamicRadius * 0.45, 0, Math.PI * 2);
     ctx.fill();
     
+    // Draw Coronal Laser warning / active beam
+    if (this.targetAttack === 'CORONAL_EJECTION') {
+      ctx.save();
+      if (this.state === 'TELEGRAPH') {
+        ctx.strokeStyle = 'rgba(255, 157, 0, 0.45)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        ctx.moveTo(this.cx, this.cy);
+        ctx.lineTo(this.cx + Math.cos(this.laserAngle) * 500, this.cy + Math.sin(this.laserAngle) * 500);
+        ctx.stroke();
+      } else if (this.state === 'ATTACK' && this.coronalLaserActive) {
+        ctx.strokeStyle = '#ff3300';
+        ctx.lineWidth = 8;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff3300';
+        ctx.beginPath();
+        ctx.moveTo(this.cx, this.cy);
+        ctx.lineTo(this.cx + Math.cos(this.laserAngle) * 500, this.cy + Math.sin(this.laserAngle) * 500);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(this.cx, this.cy);
+        ctx.lineTo(this.cx + Math.cos(this.laserAngle) * 500, this.cy + Math.sin(this.laserAngle) * 500);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Draw burning trails on player orbit path
+    if (this.burningTrails && this.burningTrails.length > 0) {
+      this.burningTrails.forEach(trail => {
+        ctx.save();
+        ctx.strokeStyle = '#ff5a00';
+        ctx.lineWidth = 10;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#ff3300';
+        ctx.beginPath();
+        const start = trail.angle - 0.08;
+        const end = trail.angle + 0.08;
+        ctx.arc(this.cx, this.cy, 220, start, end);
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+    
     ctx.restore();
+  }
+
+  updateCoronalLaser(dt, player) {
+    if (this.state !== 'ATTACK') return;
+    
+    // Update active burning trails
+    for (let i = this.burningTrails.length - 1; i >= 0; i--) {
+      const trail = this.burningTrails[i];
+      trail.life -= dt;
+      if (trail.life <= 0) {
+        this.burningTrails.splice(i, 1);
+      } else if (player.state !== 'DEAD') {
+        const playerAngle = Math.atan2(player.y - this.cy, player.x - this.cx);
+        let adiff = playerAngle - trail.angle;
+        while (adiff < -Math.PI) adiff += Math.PI * 2;
+        while (adiff > Math.PI) adiff -= Math.PI * 2;
+        if (Math.abs(adiff) < 0.08) {
+          player.takeDamage();
+        }
+      }
+    }
+
+    if (!this.coronalLaserActive) return;
+
+    // Track player slowly
+    const targetAngle = Math.atan2(player.y - this.cy, player.x - this.cx);
+    let diff = targetAngle - this.laserAngle;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    this.laserAngle += diff * 1.6 * dt;
+
+    // Spawn burning trails
+    if (Math.random() < 0.22) {
+      this.burningTrails.push({
+        angle: this.laserAngle,
+        life: 2.0
+      });
+    }
+
+    // Laser collision check
+    if (player.state !== 'DEAD') {
+      const lx = this.cx + Math.cos(this.laserAngle) * 500;
+      const ly = this.cy + Math.sin(this.laserAngle) * 500;
+      if (checkCircleLineCollision(player.x, player.y, player.radius, this.cx, this.cy, lx, ly)) {
+        player.takeDamage();
+      }
+    }
+  }
+
+  updateSolarDive(dt, player) {
+    if (!this.diveActive || this.state !== 'ATTACK') return;
+
+    // Direct lunge towards target coordinate
+    this.cx = lerp(this.cx, this.diveTargetX, 6 * dt);
+    this.cy = lerp(this.cy, this.diveTargetY, 6 * dt);
+
+    // Collision check
+    if (player.state !== 'DEAD' && getDistance(this.cx, this.cy, player.x, player.y) < this.radius + player.radius) {
+      player.takeDamage();
+    }
   }
 }

@@ -35,13 +35,24 @@ export class ClockworkConductor extends Boss {
     
     // Sequences
     this.phase1Sequence = [
-      'METRONOME_SWEEPS', 'RECOVERY',
       'NOTE_BARRAGE', 'RECOVERY',
-      'TEMPO_SHIFT', 'RECOVERY'
+      'METRONOME_SWEEPS', 'RECOVERY',
+      'TEMPO_SHIFT', 'RECOVERY',
+      'NOTE_BARRAGE', 'RECOVERY'
     ];
     
     this.phase2Sequence = [
+      'METRONOME_SCISSOR', 'RECOVERY',
+      'COMBINED_NOTE_SWEEPS', 'RECOVERY',
+      'TEMPO_SHIFT', 'RECOVERY',
+      'NOTE_BARRAGE', 'RECOVERY',
+      'METRONOME_SCISSOR', 'RECOVERY'
+    ];
+    
+    this.phase3Sequence = [
       'WOW_GRAND_FINALE', 'RECOVERY',
+      'HARMONIC_RESONANCE', 'RECOVERY',
+      'METRONOME_SCISSOR', 'RECOVERY',
       'COMBINED_NOTE_SWEEPS', 'RECOVERY',
       'TEMPO_SHIFT', 'RECOVERY'
     ];
@@ -68,6 +79,8 @@ export class ClockworkConductor extends Boss {
     this.metronomeBaseAngle = 0;
     this.metronomeSweeps = [];
     this.notes = [];
+    this.harmonicNodes = [];
+    this.harmonicLasersActive = false;
     this.tempoShiftActive = false;
     this.tempoFactor = 1.0;
     this.stavesActive = false;
@@ -81,11 +94,16 @@ export class ClockworkConductor extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 35) { // 25% of 140 maxHp
-      this.triggerPhaseTransition(2, 90); // Phase 2 has 90 HP (snappy climax!)
+    if (this.phase === 1 && this.hp <= 46) { // 33% of 140
+      this.triggerPhaseTransition(2, 120); // Phase 2 has 120 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
       this.color = '#39ff14'; // Color shifts to electric green!
+    } else if (this.phase === 2 && this.hp <= 36) { // 30% of 120
+      this.triggerPhaseTransition(3, 180); // Phase 3 has 180 HP
+      this.activeSequence = this.phase3Sequence;
+      this.sequenceIndex = 0;
+      this.color = '#ff0055'; // Color shifts to warning neon crimson!
     }
   }
 
@@ -95,6 +113,8 @@ export class ClockworkConductor extends Boss {
     this.metronomeSweeps = [];
     this.stavesActive = false;
     this.staves = [];
+    this.harmonicNodes = [];
+    this.harmonicLasersActive = false;
     const banner = document.getElementById('warning-banner');
     if (banner) banner.classList.remove('active');
   }
@@ -188,10 +208,18 @@ export class ClockworkConductor extends Boss {
       case 'METRONOME_SWEEPS':
         this.stateTimer = 1.0; // 1s warning
         this.metronomeActive = false;
-        // Metronome lasers spawn pointing down-left and down-right
+        
+        // Target player in the center of the two lasers
+        let pAngle = 0;
+        const pEl = window.gameAppInstance?.player;
+        if (pEl) {
+          pAngle = Math.atan2(pEl.y - this.cy, pEl.x - this.cx);
+        }
+        this.metronomeSweepDir = Math.random() < 0.5 ? 1 : -1;
+        this.metronomeOffset = 0;
         this.metronomeSweeps = [
-          { angle: Math.PI / 4, baseAngle: Math.PI / 4 },
-          { angle: 3 * Math.PI / 4, baseAngle: 3 * Math.PI / 4 }
+          { angle: pAngle - Math.PI / 4, baseAngle: pAngle - Math.PI / 4 },
+          { angle: pAngle + Math.PI / 4, baseAngle: pAngle + Math.PI / 4 }
         ];
         if (banner) {
           banner.textContent = "METRONOME BEAM LOCK";
@@ -226,10 +254,20 @@ export class ClockworkConductor extends Boss {
         
       case 'COMBINED_NOTE_SWEEPS':
         this.stateTimer = 1.0;
+        
+        // Target player in the center of the two lasers
+        let pAngleCombo = 0;
+        const pElCombo = window.gameAppInstance?.player;
+        if (pElCombo) {
+          pAngleCombo = Math.atan2(pElCombo.y - this.cy, pElCombo.x - this.cx);
+        }
+        this.metronomeSweepDir = Math.random() < 0.5 ? 1 : -1;
+        this.metronomeOffset = 0;
         this.metronomeSweeps = [
-          { angle: Math.PI / 4, baseAngle: Math.PI / 4 },
-          { angle: 3 * Math.PI / 4, baseAngle: 3 * Math.PI / 4 }
+          { angle: pAngleCombo - Math.PI / 4, baseAngle: pAngleCombo - Math.PI / 4 },
+          { angle: pAngleCombo + Math.PI / 4, baseAngle: pAngleCombo + Math.PI / 4 }
         ];
+        
         this.spawnNoteWave(4);
         if (banner) {
           banner.textContent = "CONCERT OVERDRIVE";
@@ -250,6 +288,54 @@ export class ClockworkConductor extends Boss {
           banner.textContent = "🎼 GRAND FINALE: METRIC SHIFT 🎼";
           banner.style.color = '#ffd700';
           banner.style.textShadow = '0 0 15px #ffd700';
+          banner.classList.add('active');
+        }
+        break;
+
+      case 'METRONOME_SCISSOR':
+        this.stateTimer = 1.0; // 1s warning
+        this.metronomeActive = false;
+        
+        // Spawns two lasers at the player's sides
+        let pAng = 0;
+        const playerEl = window.gameAppInstance?.player;
+        if (playerEl) {
+          pAng = Math.atan2(playerEl.y - this.cy, playerEl.x - this.cx);
+        }
+        this.metronomeOffset = 0;
+        // Start open on both sides of player
+        this.metronomeSweeps = [
+          { angle: pAng - Math.PI / 4, baseAngle: pAng - Math.PI / 4, dir: 1 },
+          { angle: pAng + Math.PI / 4, baseAngle: pAng + Math.PI / 4, dir: -1 }
+        ];
+        
+        if (banner) {
+          banner.textContent = "🎼 SCISSOR TEMPO DANGER 🎼";
+          banner.style.color = '#ff0055';
+          banner.style.textShadow = '0 0 10px #ff0055';
+          banner.classList.add('active');
+        }
+        break;
+
+      case 'HARMONIC_RESONANCE':
+        this.stateTimer = 1.2; // 1.2s warning
+        this.harmonicLasersActive = false;
+        // Spawns 4 sound nodes around the ring
+        this.harmonicNodes = [];
+        for (let i = 0; i < 4; i++) {
+          const angle = (Math.PI / 2) * i + Math.random() * 0.3;
+          this.harmonicNodes.push({
+            x: this.cx + Math.cos(angle) * 220,
+            y: this.cy + Math.sin(angle) * 220,
+            angle: angle,
+            targetX: this.cx,
+            targetY: this.cy
+          });
+        }
+        if (banner) {
+          banner.textContent = "🎼 HARMONIC GRID ALIGNMENT 🎼";
+          banner.style.color = '#39ff14';
+          banner.style.textShadow = '0 0 10px #39ff14';
           banner.classList.add('active');
         }
         break;
@@ -284,6 +370,16 @@ export class ClockworkConductor extends Boss {
       case 'WOW_GRAND_FINALE':
         this.stateTimer = 5.0; // Staves active for 5 seconds
         break;
+
+      case 'METRONOME_SCISSOR':
+        this.stateTimer = 3.5;
+        this.metronomeActive = true;
+        break;
+
+      case 'HARMONIC_RESONANCE':
+        this.stateTimer = 4.0;
+        this.harmonicLasersActive = true;
+        break;
     }
   }
 
@@ -291,11 +387,12 @@ export class ClockworkConductor extends Boss {
     switch (this.targetAttack) {
       case 'METRONOME_SWEEPS':
       case 'COMBINED_NOTE_SWEEPS':
-        // Metronome lasers swing left and right in sync with time
-        // angle oscillates around their base starting angles
-        const timeFactor = Date.now() * 0.0035;
+        // Metronome lasers swing/rotate steadily around the circle, framing the player in the middle
+        const sweepSpeed = 0.72 * (this.metronomeSweepDir || 1);
+        this.metronomeOffset = (this.metronomeOffset || 0) + sweepSpeed * dt;
+        
         this.metronomeSweeps.forEach(sweep => {
-          sweep.angle = sweep.baseAngle + Math.sin(timeFactor) * 0.7;
+          sweep.angle = sweep.baseAngle + this.metronomeOffset;
           
           // Collision checks
           if (player.state !== 'DEAD') {
@@ -303,6 +400,42 @@ export class ClockworkConductor extends Boss {
             const ly2 = this.cy + Math.sin(sweep.angle) * 500;
             
             if (checkCircleLineCollision(player.x, player.y, player.radius, this.cx, this.cy, lx2, ly2)) {
+              player.takeDamage();
+            }
+          }
+        });
+        break;
+
+      case 'METRONOME_SCISSOR':
+        // The two lasers close together to pinch the player!
+        const closeSpeed = 0.28 * dt;
+        this.metronomeSweeps.forEach(sweep => {
+          sweep.angle += closeSpeed * sweep.dir;
+          
+          // Collision checks
+          if (player.state !== 'DEAD') {
+            const lx2 = this.cx + Math.cos(sweep.angle) * 500;
+            const ly2 = this.cy + Math.sin(sweep.angle) * 500;
+            if (checkCircleLineCollision(player.x, player.y, player.radius, this.cx, this.cy, lx2, ly2)) {
+              player.takeDamage();
+            }
+          }
+        });
+        break;
+
+      case 'HARMONIC_RESONANCE':
+        // The nodes fire lasers across the orbit
+        this.harmonicNodes.forEach(node => {
+          node.angle += 0.15 * dt;
+          node.x = this.cx + Math.cos(node.angle) * 220;
+          node.y = this.cy + Math.sin(node.angle) * 220;
+          
+          if (this.harmonicLasersActive && player.state !== 'DEAD') {
+            const oppositeAngle = node.angle + Math.PI;
+            const lx2 = this.cx + Math.cos(oppositeAngle) * 220;
+            const ly2 = this.cy + Math.sin(oppositeAngle) * 220;
+            
+            if (checkCircleLineCollision(player.x, player.y, player.radius, node.x, node.y, lx2, ly2)) {
               player.takeDamage();
             }
           }
@@ -479,6 +612,52 @@ export class ClockworkConductor extends Boss {
           ctx.lineTo(this.cx + Math.cos(sweep.angle) * 500, this.cy + Math.sin(sweep.angle) * 500);
           ctx.stroke();
         }
+        ctx.restore();
+      });
+    }
+    
+    // Draw Harmonic Resonance grid nodes / lasers
+    if (this.harmonicNodes.length > 0) {
+      this.harmonicNodes.forEach(node => {
+        ctx.save();
+        if (this.harmonicLasersActive) {
+          // Fire glowing active green laser across diameter
+          ctx.strokeStyle = '#39ff14';
+          ctx.lineWidth = 6;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = '#39ff14';
+          const oppositeAngle = node.angle + Math.PI;
+          ctx.beginPath();
+          ctx.moveTo(node.x, node.y);
+          ctx.lineTo(this.cx + Math.cos(oppositeAngle) * 220, this.cy + Math.sin(oppositeAngle) * 220);
+          ctx.stroke();
+          
+          // White core
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(node.x, node.y);
+          ctx.lineTo(this.cx + Math.cos(oppositeAngle) * 220, this.cy + Math.sin(oppositeAngle) * 220);
+          ctx.stroke();
+        } else {
+          // Warning grid line
+          ctx.strokeStyle = 'rgba(57, 255, 20, 0.4)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 6]);
+          const oppositeAngle = node.angle + Math.PI;
+          ctx.beginPath();
+          ctx.moveTo(node.x, node.y);
+          ctx.lineTo(this.cx + Math.cos(oppositeAngle) * 220, this.cy + Math.sin(oppositeAngle) * 220);
+          ctx.stroke();
+        }
+        
+        // Draw node cap itself
+        ctx.fillStyle = this.harmonicLasersActive ? '#ffffff' : '#39ff14';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#39ff14';
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 8, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
       });
     }

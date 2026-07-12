@@ -36,21 +36,28 @@ export class ShadowWeaver extends Boss {
     this.phase1Sequence = [
       'VOID_WEBS', 'RECOVERY',
       'DECOY_SPLIT', 'RECOVERY',
-      'WEAVE_SHIELDS', 'RECOVERY'
+      'WEAVE_SHIELDS', 'RECOVERY',
+      'VOID_WEBS', 'RECOVERY',
+      'DECOY_SPLIT', 'RECOVERY'
     ];
     
     this.phase2Sequence = [
-      'WEAVE_SHIELDS', 'RECOVERY',
-      'VOID_WEBS', 'RECOVERY',
+      'WOW_TOTAL_ECLIPSE', 'RECOVERY',
+      'COMBINED_WEBS_SHIELDS', 'RECOVERY',
       'DECOY_SPLIT', 'RECOVERY',
-      'COMBINED_WEBS_SHIELDS', 'RECOVERY'
+      'VOID_WEBS', 'RECOVERY',
+      'WEAVE_SHIELDS', 'RECOVERY'
     ];
     
-    this.finalSequence = [
+    this.phase3Sequence = [
+      'COMBINED_ECLIPSE_DECOYS', 'RECOVERY',
       'WOW_TOTAL_ECLIPSE', 'RECOVERY',
+      'COMBINED_DECOYS_WEBS', 'RECOVERY',
       'COMBINED_WEBS_SHIELDS', 'RECOVERY',
       'DECOY_SPLIT', 'RECOVERY'
     ];
+    
+    this.finalSequence = [];
     
     this.maxHp = 180;
     this.hp = 180;
@@ -69,6 +76,10 @@ export class ShadowWeaver extends Boss {
     this.decoys = [];
     this.voidWebs = [];
     this.spotlightActive = false;
+    this.spotlightAngle = 0;
+    this.spotlightSpeed = 1.0;
+    this.eyeX = 0;
+    this.eyeY = 0;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -299,12 +310,55 @@ export class ShadowWeaver extends Boss {
       case 'WOW_TOTAL_ECLIPSE':
         this.stateTimer = 1.5;
         this.spotlightActive = true;
-        this.spotlightAngle = Math.random() * Math.PI * 2;
-        this.spotlightSpeed = Math.random() < 0.5 ? 0.6 : -0.6;
+        
+        // Target player angle for safety at start
+        let pAngle = 0;
+        const pE = window.gameAppInstance?.player;
+        if (pE) {
+          pAngle = Math.atan2(pE.y - this.cy, pE.x - this.cx);
+        } else {
+          pAngle = Math.random() * Math.PI * 2;
+        }
+        this.spotlightAngle = pAngle;
+        this.spotlightSpeed = Math.random() < 0.5 ? 0.65 : -0.65;
+        
         if (banner) {
           banner.textContent = "⚠️ TOTAL ECLIPSE: STAY IN LIGHT ⚠️";
           banner.style.color = '#ffffff';
           banner.style.textShadow = '0 0 15px #9d00ff';
+          banner.classList.add('active');
+        }
+        break;
+
+      case 'COMBINED_DECOYS_WEBS':
+        this.stateTimer = 1.0;
+        if (banner) {
+          banner.textContent = "DECOY NESTING PROTOCOL";
+          banner.style.color = '#ff0033';
+          banner.style.textShadow = '0 0 10px #ff0033';
+          banner.classList.add('active');
+        }
+        break;
+
+      case 'COMBINED_ECLIPSE_DECOYS':
+        this.stateTimer = 1.5;
+        this.spotlightActive = true;
+        
+        // Target player angle for safety at start
+        let pAng = 0;
+        const pEl = window.gameAppInstance?.player;
+        if (pEl) {
+          pAng = Math.atan2(pEl.y - this.cy, pEl.x - this.cx);
+        } else {
+          pAng = Math.random() * Math.PI * 2;
+        }
+        this.spotlightAngle = pAng;
+        this.spotlightSpeed = Math.random() < 0.5 ? 0.7 : -0.7;
+        
+        if (banner) {
+          banner.textContent = "⚠️ ECLIPSE MIRROR OVERLOAD ⚠️";
+          banner.style.color = '#ff0033';
+          banner.style.textShadow = '0 0 15px #ff0033';
           banner.classList.add('active');
         }
         break;
@@ -339,6 +393,17 @@ export class ShadowWeaver extends Boss {
         
       case 'WOW_TOTAL_ECLIPSE':
         this.stateTimer = 6.0; // Stay in light for 6s
+        break;
+
+      case 'COMBINED_DECOYS_WEBS':
+        this.stateTimer = 5.0;
+        this.spawnDecoys();
+        this.spawnVoidWebs(2);
+        break;
+
+      case 'COMBINED_ECLIPSE_DECOYS':
+        this.stateTimer = 6.5;
+        this.spawnDecoys();
         break;
     }
   }
@@ -533,11 +598,11 @@ export class ShadowWeaver extends Boss {
     if (this.cageActive && this.state !== 'DEAD' && this.state !== 'TRANSITION') {
       ctx.save();
       // Warn vs Active
-      ctx.strokeStyle = (this.state === 'TELEGRAPH' && this.targetAttack === 'WEAVE_SHIELDS') ? 'rgba(255, 215, 0, 0.45)' : '#9d00ff';
+      ctx.strokeStyle = (this.state === 'TELEGRAPH' && (this.targetAttack === 'WEAVE_SHIELDS' || this.targetAttack === 'COMBINED_WEBS_SHIELDS')) ? 'rgba(255, 215, 0, 0.45)' : this.color;
       ctx.lineWidth = 4;
       ctx.shadowBlur = 12;
-      ctx.shadowColor = '#9d00ff';
-      if (this.state === 'TELEGRAPH' && this.targetAttack === 'WEAVE_SHIELDS') {
+      ctx.shadowColor = this.color;
+      if (this.state === 'TELEGRAPH' && (this.targetAttack === 'WEAVE_SHIELDS' || this.targetAttack === 'COMBINED_WEBS_SHIELDS')) {
         ctx.setLineDash([4, 6]);
       }
       
@@ -584,23 +649,25 @@ export class ShadowWeaver extends Boss {
       return;
     }
     
-    // Draw Void Octagram Web lattice in Phase 2
-    if (this.phase === 2) {
+    // Draw Void Octagram / Dodecagram Web lattice in Phase 2/3
+    if (this.phase >= 2) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(218, 18, 218, 0.45)';
+      const webColor = this.phase === 3 ? 'rgba(255, 0, 51, 0.45)' : 'rgba(218, 18, 218, 0.45)';
+      ctx.strokeStyle = webColor;
       ctx.lineWidth = 1.5;
       ctx.shadowBlur = 10;
-      ctx.shadowColor = '#da12da';
+      ctx.shadowColor = this.color;
       ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const angle1 = (Math.PI * 2 / 8) * i + Date.now() * 0.001;
+      const segments = this.phase === 3 ? 12 : 8;
+      for (let i = 0; i < segments; i++) {
+        const angle1 = (Math.PI * 2 / segments) * i + Date.now() * 0.001;
         const px1 = this.cx + Math.cos(angle1) * (dynamicRadius + 18);
         const py1 = this.cy + Math.sin(angle1) * (dynamicRadius + 18);
         
         ctx.moveTo(this.cx, this.cy);
         ctx.lineTo(px1, py1);
         
-        const angle2 = (Math.PI * 2 / 8) * ((i + 1) % 8) + Date.now() * 0.001;
+        const angle2 = (Math.PI * 2 / segments) * ((i + 1) % segments) + Date.now() * 0.001;
         const px2 = this.cx + Math.cos(angle2) * (dynamicRadius + 18);
         const py2 = this.cy + Math.sin(angle2) * (dynamicRadius + 18);
         ctx.moveTo(px1, py1);
@@ -611,7 +678,7 @@ export class ShadowWeaver extends Boss {
     }
 
     // Draw geometric spider shape
-    ctx.fillStyle = this.phase === 2 ? '#0b001a' : '#0a0010';
+    ctx.fillStyle = this.phase === 3 ? '#1a0005' : (this.phase === 2 ? '#0b001a' : '#0a0010');
     ctx.strokeStyle = this.color;
     ctx.lineWidth = 4;
     ctx.shadowBlur = dynamicRadius * 0.55;

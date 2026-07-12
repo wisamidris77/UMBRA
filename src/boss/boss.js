@@ -89,6 +89,8 @@ export class Boss {
     this.hitFlashTimer = 0;
     this.wowAttackTriggered = false;
     this.telegraphBeepPlayed = false;
+    this.activeSequence = this.phase1Sequence;
+    this.recoveryDuration = 2.0;
 
     // Reset animations
     this.deathRotation = 0;
@@ -130,7 +132,10 @@ export class Boss {
       hpBar.style.width = `${hpPercent}%`;
       
       // Dynamic boss HP bar styling based on phase and remaining health
-      if (this.phase === 2) {
+      if (this.phase === 3) {
+        hpBar.style.background = 'linear-gradient(90deg, #ff0033, #ff00ff)';
+        hpBar.style.boxShadow = '0 0 15px #ff0033';
+      } else if (this.phase === 2) {
         hpBar.style.background = 'linear-gradient(90deg, #ff00ff, #00f3ff)';
         hpBar.style.boxShadow = '0 0 15px #ff00ff';
       } else {
@@ -145,7 +150,10 @@ export class Boss {
     }
     
     if (container) {
-      if (this.phase === 2) {
+      if (this.phase === 3) {
+        container.style.width = '70%';
+        container.style.maxWidth = '750px';
+      } else if (this.phase === 2) {
         container.style.width = '60%';
         container.style.maxWidth = '600px';
       } else {
@@ -155,9 +163,11 @@ export class Boss {
     }
     
     if (bossNameEl) {
-      // Don't say "PHASE 2" in text, just show name, styled differently
       bossNameEl.textContent = this.name;
-      if (this.phase === 2) {
+      if (this.phase === 3) {
+        bossNameEl.style.color = '#ff0033';
+        bossNameEl.style.textShadow = '0 0 10px #ff0033';
+      } else if (this.phase === 2) {
         bossNameEl.style.color = '#ff00ff';
         bossNameEl.style.textShadow = '0 0 10px #ff00ff';
       } else {
@@ -178,14 +188,16 @@ export class Boss {
   triggerPhaseTransition(nextPhase, newMaxHp) {
     this.phase = nextPhase;
     
-    // Surprise Phase 2: instant transition!
-    if (nextPhase === 2) {
+    if (nextPhase === 2 || nextPhase === 3) {
       // Use new custom max HP if provided, otherwise default to current maxHp
       this.maxHp = newMaxHp || this.maxHp;
       this.hp = this.maxHp;
       
       // Speed up tempo in Audio Engine
-      audio.setBPM(120);
+      audio.setBPM(nextPhase === 3 ? 135 : 120);
+      
+      // Reduce cooldown between attacks in phase 2 and 3!
+      this.recoveryDuration = 0.6;
       
       // Interrupt current attack and clean up active hazards!
       this.state = 'RECOVERY';
@@ -194,7 +206,7 @@ export class Boss {
       this.activeAttackCleanup();
       
       // Visual transition effects (instant flash & shards, but NO state timer freeze)
-      screenShake.trigger(25, 0.8);
+      screenShake.trigger(30, 0.85);
       audio.playBossExplode();
       particles.spawnExplosion(this.cx, this.cy, '#ffffff', 40, 10);
       particles.spawnShards(this.cx, this.cy, this.color, 25, 7);

@@ -8,10 +8,9 @@ import { Player } from './player.js';
 import { MechanicalEye } from './boss/eye.js';
 import { CrystalTitan } from './boss/titan.js';
 import { ClockworkConductor } from './boss/conductor.js';
-import { SolarPhoenix } from './boss/phoenix.js';
 import { ShadowWeaver } from './boss/weaver.js';
 import { VoidSingularity } from './boss/singularity.js';
-import { AlchemicalCauldron } from './boss/cauldron.js';
+import { Sigma } from './boss/sigma.js';
 import { audio } from './audio.js';
 import { particles, screenShake, hitStop } from './particle.js';
 import { debug } from './debug.js';
@@ -97,10 +96,9 @@ class GameApp {
     this.bossEye = null;
     this.bossTitan = null;
     this.bossConductor = null;
-    this.bossPhoenix = null;
     this.bossWeaver = null;
     this.bossSingularity = null;
-    this.bossCauldron = null;
+    this.bossSigma = null;
     this.chest = null;
     
     // Timers
@@ -137,10 +135,9 @@ class GameApp {
     this.bossEye = new MechanicalEye(this.cx, this.cy);
     this.bossTitan = new CrystalTitan(this.cx, this.cy);
     this.bossConductor = new ClockworkConductor(this.cx, this.cy);
-    this.bossPhoenix = new SolarPhoenix(this.cx, this.cy);
     this.bossWeaver = new ShadowWeaver(this.cx, this.cy);
     this.bossSingularity = new VoidSingularity(this.cx, this.cy);
-    this.bossCauldron = new AlchemicalCauldron(this.cx, this.cy);
+    this.bossSigma = new Sigma(this.cx, this.cy);
     
     // Load saved campaign level and upgrades
     this.loadJourney();
@@ -174,7 +171,7 @@ class GameApp {
 
   loadJourney() {
     this.currentLevel = parseInt(localStorage.getItem('orbital_bound_campaign_level') || '1', 10);
-    if (isNaN(this.currentLevel) || this.currentLevel < 1 || this.currentLevel > 7) {
+    if (isNaN(this.currentLevel) || this.currentLevel < 1 || this.currentLevel > 6) {
       this.currentLevel = 1;
     }
     try {
@@ -191,10 +188,9 @@ class GameApp {
     if (level === 1) this.boss = this.bossEye;
     else if (level === 2) this.boss = this.bossTitan;
     else if (level === 3) this.boss = this.bossConductor;
-    else if (level === 4) this.boss = this.bossPhoenix;
-    else if (level === 5) this.boss = this.bossWeaver;
-    else if (level === 6) this.boss = this.bossSingularity;
-    else if (level === 7) this.boss = this.bossCauldron;
+    else if (level === 4) this.boss = this.bossWeaver;
+    else if (level === 5) this.boss = this.bossSingularity;
+    else if (level === 6) this.boss = this.bossSigma;
 
     const sectorSelect = document.getElementById('debug-sector-select');
     if (sectorSelect) {
@@ -332,16 +328,34 @@ class GameApp {
 
     // Keyboard bindings
     let debugSequence = '';
+    let killSequence = '';
     window.addEventListener('keydown', (e) => {
-      // Trace cheat sequence
-      if (['l', 'k', 'j'].includes(e.key.toLowerCase())) {
-        debugSequence += e.key.toLowerCase();
+      const key = e.key.toLowerCase();
+      
+      // Trace cheat sequence: lkj (insta charge)
+      if (['l', 'k', 'j'].includes(key)) {
+        debugSequence += key;
         if (debugSequence.endsWith('lkjlkjlkj')) {
           this.toggleSuperDebugCheat();
           debugSequence = '';
         }
       } else {
         debugSequence = '';
+      }
+
+      // Trace cheat sequence: mnb (instant kill boss)
+      if (['m', 'n', 'b'].includes(key)) {
+        killSequence += key;
+        if (killSequence.endsWith('mnbmnbmnbmnbmnb')) {
+          if (this.state === 'PLAYING' && this.boss && this.boss.state !== 'DEAD') {
+            this.boss.takeDamage(9999);
+            audio.playBossExplode();
+            particles.spawnExplosion(this.boss.cx, this.boss.cy, '#ff0033', 50, 15);
+          }
+          killSequence = '';
+        }
+      } else {
+        killSequence = '';
       }
 
       if (e.code === 'Space') {
@@ -352,6 +366,15 @@ class GameApp {
             // Start hold confirmation on current selection (do not cycle on keydown!)
             this.isHoldingSpace = true;
             this.spaceHoldTime = 0;
+          }
+        } else if (this.state === 'ENDING_STORY') {
+          if (this.endingStage === 'GEOMETRY_CARDS' && !e.repeat) {
+            this.advanceGeometryCard();
+          } else if (this.endingStage === 'DIALOGUE' && this.activeDialogueChoices && this.activeDialogueChoices.length > 0) {
+            if (!e.repeat) {
+              this.isHoldingSpaceEnding = true;
+              this.spaceHoldTimeEnding = 0;
+            }
           }
         } else {
           handlePress(e);
@@ -385,6 +408,19 @@ class GameApp {
               if (idx === this.lootSelectedIndex) c.classList.add('selected');
               else c.classList.remove('selected');
             });
+          }
+        } else if (this.state === 'ENDING_STORY') {
+          if (this.endingStage === 'DIALOGUE' && this.isHoldingSpaceEnding) {
+            this.isHoldingSpaceEnding = false;
+            if (this.spaceHoldTimeEnding < 1.0) {
+              this.spaceHoldTimeEnding = 0;
+              const barInner = document.getElementById('dialogue-hold-bar-inner');
+              if (barInner) barInner.style.width = '0%';
+              
+              this.dialogueSelectedChoiceIndex = (this.dialogueSelectedChoiceIndex + 1) % this.activeDialogueChoices.length;
+              this.updateDialogueChoiceSelectionVisuals();
+              audio.playNoteHitSFX();
+            }
           }
         } else {
           handleRelease(e);
@@ -739,21 +775,564 @@ class GameApp {
     this.selectedUpgrade = null;
     document.getElementById('loot-overlay').classList.remove('active');
     
-    if (this.currentLevel < 7) {
+    if (this.currentLevel < 6) {
       this.setLevelBoss(this.currentLevel + 1);
       this.saveJourney();
       this.startGame();
     } else {
-      // Finished all 7 levels
+      // Finished all 6 levels
       this.setLevelBoss(1);
       this.upgrades = {}; // reset upgrades for new campaign run
       this.saveJourney();
-      document.getElementById('menu-overlay').classList.add('active');
-      this.state = 'MENU';
-      this.updateInventoryUI();
-      audio.stopMusic();
-      audio.playTrack('soundtracks/menu.mp3', 100);
+      this.triggerEndingStory();
     }
+  }
+
+  triggerEndingStory() {
+    this.state = 'ENDING_STORY';
+    this.endingStage = 'DIALOGUE';
+    
+    this.setLevelBoss(1);
+    this.upgrades = {};
+    this.saveJourney();
+    
+    this.isHoldingSpaceEnding = false;
+    this.spaceHoldTimeEnding = 0;
+    this.activeDialogueChoices = [];
+    this.dialogueSelectedChoiceIndex = 0;
+    
+    audio.stopMusic();
+    audio.playTrack('soundtracks/menu.mp3', 100);
+    
+    // Show overlay
+    const storyOverlay = document.getElementById('story-overlay');
+    if (storyOverlay) storyOverlay.classList.add('active');
+    
+    // Show dialogue screen, hide geometry screen
+    document.getElementById('story-dialogue-screen').classList.add('active');
+    document.getElementById('story-geometry-screen').classList.remove('active');
+    
+    const dialogueLog = document.getElementById('dialogue-log');
+    const dialogueChoices = document.getElementById('dialogue-choices');
+    if (dialogueLog) dialogueLog.innerHTML = '';
+    if (dialogueChoices) dialogueChoices.innerHTML = '';
+    
+    // Start dialogue tree
+    setTimeout(() => {
+      this.renderDialogueLine('entity-a', "DID YOU HAVE FUN", () => {
+        this.showDialogueChoices([
+          {
+            text: "I THINK I DID",
+            action: () => {
+              this.renderDialogueLine('entity-b', "I THINK I DID", () => {
+                audio.playClickSFX();
+                setTimeout(() => {
+                  this.renderDialogueLine('entity-a', "YEAH LESS PEOPLE MAKE IT UP HERE", () => {
+                    setTimeout(() => {
+                      this.renderDialogueLine('entity-a', "HOPE YOU LIKED MY GAME :)", () => {
+                        audio.playHealSFX();
+                        screenShake.trigger(10, 0.3);
+                        setTimeout(() => {
+                          this.renderDialogueLine('entity-a', "do you know what is the story...", () => {
+                            setTimeout(() => {
+                              this.showDialogueChoices([
+                                {
+                                  text: "SHOW ME THE STORY",
+                                  action: () => {
+                                    audio.playUpgradeSelectedSFX();
+                                    this.startGeometryCards();
+                                  }
+                                }
+                              ]);
+                            }, 800);
+                          });
+                        }, 2200);
+                      });
+                    }, 1800);
+                  });
+                }, 1000);
+              });
+            }
+          },
+          {
+            text: "I DIDN'T",
+            action: () => {
+              this.renderDialogueLine('entity-b', "I DIDN'T", () => {
+                audio.playClickSFX();
+                setTimeout(() => {
+                  this.renderDialogueLine('entity-a', "YOU SEE LESS PEOPLE MAKE IT HERE", () => {
+                    setTimeout(() => {
+                      this.showDialogueChoices([
+                        {
+                          text: "WANT TO KNOW WHY",
+                          action: () => {
+                            this.renderDialogueLine('entity-b', "WANT TO KNOW WHY", () => {
+                              audio.playClickSFX();
+                              setTimeout(() => {
+                                this.renderDialogueLine('entity-a', "because you had FUN", () => {
+                                  setTimeout(() => {
+                                    this.renderDialogueLine('entity-a', "HOPE YOU LIKED MY GAME :)", () => {
+                                      audio.playHealSFX();
+                                      screenShake.trigger(10, 0.3);
+                                      setTimeout(() => {
+                                        this.renderDialogueLine('entity-a', "do you know what is the story...", () => {
+                                          setTimeout(() => {
+                                            this.showDialogueChoices([
+                                              {
+                                                text: "SHOW ME THE STORY",
+                                                action: () => {
+                                                  audio.playUpgradeSelectedSFX();
+                                                  this.startGeometryCards();
+                                                }
+                                              }
+                                            ]);
+                                          }, 800);
+                                        });
+                                      }, 2200);
+                                    });
+                                  }, 1800);
+                                });
+                              }, 1000);
+                            });
+                          }
+                        }
+                      ]);
+                    }, 1000);
+                  });
+                }, 1000);
+              });
+            }
+          }
+        ]);
+      });
+    }, 1200);
+  }
+
+  renderDialogueLine(sender, text, callback) {
+    const dialogueLog = document.getElementById('dialogue-log');
+    if (!dialogueLog) return;
+    
+    const bubble = document.createElement('div');
+    bubble.className = `dialogue-bubble ${sender}`;
+    dialogueLog.appendChild(bubble);
+    
+    let charIndex = 0;
+    audio.playNoteHitSFX();
+    
+    const typeNextChar = () => {
+      bubble.textContent += text[charIndex];
+      charIndex++;
+      if (charIndex < text.length) {
+        if (text[charIndex] === ' ') {
+          audio.playNoteHitSFX();
+        }
+        setTimeout(typeNextChar, 55);
+      } else {
+        dialogueLog.scrollTop = dialogueLog.scrollHeight;
+        if (callback) callback();
+      }
+    };
+    typeNextChar();
+  }
+
+  showDialogueChoices(choices) {
+    this.activeDialogueChoices = choices;
+    this.dialogueSelectedChoiceIndex = 0;
+    
+    const dialogueChoices = document.getElementById('dialogue-choices');
+    const holdContainer = document.getElementById('dialogue-hold-container');
+    if (!dialogueChoices) return;
+    dialogueChoices.innerHTML = '';
+    
+    if (holdContainer) holdContainer.style.display = choices.length > 0 ? 'flex' : 'none';
+    
+    choices.forEach((c, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'dialogue-choice-btn';
+      btn.textContent = c.text;
+      
+      btn.addEventListener('click', () => {
+        this.activeDialogueChoices = [];
+        dialogueChoices.innerHTML = '';
+        if (holdContainer) holdContainer.style.display = 'none';
+        c.action();
+      });
+      
+      dialogueChoices.appendChild(btn);
+    });
+    
+    this.updateDialogueChoiceSelectionVisuals();
+  }
+
+  updateDialogueChoiceSelectionVisuals() {
+    const buttons = document.querySelectorAll('.dialogue-choice-btn');
+    buttons.forEach((btn, idx) => {
+      if (idx === this.dialogueSelectedChoiceIndex) {
+        btn.classList.add('selected');
+      } else {
+        btn.classList.remove('selected');
+      }
+    });
+  }
+
+  startGeometryCards() {
+    this.endingStage = 'GEOMETRY_CARDS';
+    
+    const storyContainer = document.querySelector('.story-container');
+    if (storyContainer) {
+      storyContainer.classList.add('flash-white');
+      setTimeout(() => storyContainer.classList.remove('flash-white'), 400);
+    }
+    
+    document.getElementById('story-dialogue-screen').classList.remove('active');
+    document.getElementById('story-geometry-screen').classList.add('active');
+    
+    this.currentStoryCard = 0;
+    this.storyAnimationTime = 0;
+    
+    this.storyCards = [
+      {
+        title: "THE ANOMALY",
+        body: "Deep in the unmapped sectors of UMBRA, a high-gravity reactor was built to power interstellar grids. But the core reached critical density, turning into a perpetual temporal anomaly. Space and time began to tear.",
+        draw: (ctx, t) => {
+          ctx.strokeStyle = '#ff9d00';
+          ctx.lineWidth = 2;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = '#ff9d00';
+          
+          const size = 65 + Math.sin(t * 3) * 15;
+          ctx.save();
+          ctx.translate(200, 200);
+          ctx.rotate(t * 0.8);
+          
+          ctx.beginPath();
+          ctx.rect(-size/2, -size/2, size, size);
+          ctx.stroke();
+          
+          ctx.strokeStyle = '#00f3ff';
+          ctx.shadowColor = '#00f3ff';
+          ctx.beginPath();
+          ctx.rect(-size/3, -size/3, size, size);
+          ctx.stroke();
+          
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+          ctx.beginPath();
+          ctx.moveTo(-size/2, -size/2); ctx.lineTo(-size/3, -size/3);
+          ctx.moveTo(size/2, -size/2); ctx.lineTo(size/1.5, -size/3);
+          ctx.moveTo(-size/2, size/2); ctx.lineTo(-size/3, size/1.5);
+          ctx.moveTo(size/2, size/2); ctx.lineTo(size/1.5, size/1.5);
+          ctx.stroke();
+          
+          ctx.restore();
+        }
+      },
+      {
+        title: "THE ORBIT",
+        body: "You are the Vanguard Pilot, sent on a terminal mission: enter the core's gravity well, bypass the automated sentinel shields, and harvest the alchemical matter before the reactor collapses.",
+        draw: (ctx, t) => {
+          ctx.fillStyle = '#000';
+          ctx.strokeStyle = '#ff00ff';
+          ctx.lineWidth = 3;
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = '#ff00ff';
+          
+          ctx.beginPath();
+          ctx.arc(200, 200, 40 + Math.sin(t * 5) * 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(200, 200, 100, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          ctx.save();
+          ctx.translate(200, 200);
+          ctx.rotate(t * 1.5);
+          ctx.fillStyle = '#00f3ff';
+          ctx.shadowColor = '#00f3ff';
+          ctx.shadowBlur = 10;
+          
+          ctx.beginPath();
+          ctx.moveTo(100, -8);
+          ctx.lineTo(112, 0);
+          ctx.lineTo(100, 8);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.strokeStyle = 'rgba(0, 243, 255, 0.4)';
+          ctx.beginPath();
+          ctx.arc(0, 0, 100, -0.3, 0);
+          ctx.stroke();
+          
+          ctx.restore();
+        }
+      },
+      {
+        title: "THE GUARDIANS",
+        body: "The core's defenses were not programmed to be defeated. Sector by sector, they evolved, learning from your movement, firing hyper-dense plasma, web lattices, and gravitational sweeps to crush your resolve.",
+        draw: (ctx, t) => {
+          ctx.save();
+          ctx.translate(200, 200);
+          ctx.rotate(-t * 0.5);
+          
+          ctx.strokeStyle = '#ff0033';
+          ctx.shadowColor = '#ff0033';
+          ctx.shadowBlur = 15;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI / 4) * i;
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(angle) * 130, Math.sin(angle) * 130);
+          }
+          ctx.stroke();
+          
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(0, 0, 70 + Math.sin(t*4)*10, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          ctx.restore();
+        }
+      },
+      {
+        title: "THE LOOP",
+        body: "As you shattered the final cauldron core, the gravity well collapsed. But there was no escape—the anomaly bent time backward. You are locked in the perfect, endless orbit. An eternal playtest.",
+        draw: (ctx, t) => {
+          ctx.save();
+          ctx.translate(200, 200);
+          ctx.strokeStyle = '#9d00ff';
+          ctx.shadowColor = '#9d00ff';
+          ctx.shadowBlur = 18;
+          ctx.lineWidth = 2.5;
+          
+          ctx.beginPath();
+          for (let i = 0; i < 200; i++) {
+            const angle = i * 0.12 + t * 2.0;
+            const r = i * 0.75;
+            const x = Math.cos(angle) * r;
+            const y = Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+      },
+      {
+        title: "THE ASCENSION",
+        body: "Yet, you survived. By conquering the recursion, you ascended beyond the simulator. The code is yours. The orbit is yours. Thank you for playing UMBRA.",
+        draw: (ctx, t) => {
+          ctx.strokeStyle = '#00f3ff';
+          ctx.shadowColor = '#00f3ff';
+          ctx.shadowBlur = 12;
+          ctx.lineWidth = 1.5;
+          
+          ctx.save();
+          ctx.translate(200, 220);
+          
+          ctx.beginPath();
+          ctx.moveTo(-180, 0);
+          ctx.lineTo(180, 0);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          for (let i = -6; i <= 6; i++) {
+            ctx.moveTo(i * 12, 0);
+            ctx.lineTo(i * 45, 120);
+          }
+          ctx.stroke();
+          
+          ctx.strokeStyle = 'rgba(0, 243, 255, 0.4)';
+          const lineYOffset = (t * 50) % 30;
+          for (let y = lineYOffset; y < 120; y += 30) {
+            ctx.beginPath();
+            const leftX = -180 * (y / 120);
+            const rightX = 180 * (y / 120);
+            ctx.moveTo(leftX, y);
+            ctx.lineTo(rightX, y);
+            ctx.stroke();
+          }
+          
+          ctx.restore();
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#ff00ff';
+          ctx.shadowColor = '#ff00ff';
+          ctx.shadowBlur = 20;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(200, 120, 25, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+    ];
+
+    this.showGeometryCard(0);
+
+    const geometryScreen = document.getElementById('story-geometry-screen');
+    geometryScreen.onclick = () => this.advanceGeometryCard();
+
+    this.geometryLoopActive = true;
+    const canvas = document.getElementById('geometry-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    const renderLoop = () => {
+      if (!this.geometryLoopActive) return;
+      ctx.fillStyle = '#05060a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      this.storyAnimationTime += 0.016;
+      const activeCard = this.storyCards[this.currentStoryCard];
+      if (activeCard) {
+        activeCard.draw(ctx, this.storyAnimationTime);
+      }
+      requestAnimationFrame(renderLoop);
+    };
+    renderLoop();
+  }
+
+  showGeometryCard(index) {
+    const card = this.storyCards[index];
+    if (!card) return;
+    
+    audio.playWaveSpawn();
+    
+    const titleEl = document.getElementById('geometry-card-title');
+    const bodyEl = document.getElementById('geometry-card-body');
+    
+    if (titleEl) {
+      titleEl.textContent = card.title;
+      const colors = ['#ff9d00', '#ff00ff', '#ff0033', '#9d00ff', '#00f3ff'];
+      titleEl.style.color = colors[index % colors.length];
+      titleEl.style.textShadow = `0 0 10px ${colors[index % colors.length]}`;
+    }
+    
+    if (bodyEl) {
+      bodyEl.textContent = '';
+      let charIndex = 0;
+      const typeText = () => {
+        if (this.currentStoryCard !== index) return;
+        bodyEl.textContent += card.body[charIndex];
+        charIndex++;
+        if (charIndex < card.body.length) {
+          setTimeout(typeText, 25);
+        }
+      };
+      typeText();
+    }
+  }
+
+  advanceGeometryCard() {
+    this.currentStoryCard++;
+    if (this.currentStoryCard < this.storyCards.length) {
+      const storyContainer = document.querySelector('.story-container');
+      if (storyContainer) {
+        storyContainer.classList.add('flash-white');
+        setTimeout(() => storyContainer.classList.remove('flash-white'), 400);
+      }
+      this.showGeometryCard(this.currentStoryCard);
+    } else {
+      this.geometryLoopActive = false;
+      
+      const storyContainer = document.querySelector('.story-container');
+      if (storyContainer) {
+        storyContainer.classList.add('flash-white');
+        setTimeout(() => storyContainer.classList.remove('flash-white'), 400);
+      }
+      
+      document.getElementById('story-geometry-screen').classList.remove('active');
+      document.getElementById('story-dialogue-screen').classList.add('active');
+      
+      this.endingStage = 'DIALOGUE';
+      this.activeDialogueChoices = [];
+      this.dialogueSelectedChoiceIndex = 0;
+      
+      const dialogueLog = document.getElementById('dialogue-log');
+      if (dialogueLog) dialogueLog.innerHTML = '';
+      
+      setTimeout(() => {
+        this.renderDialogueLine('entity-a', "now you know the story do you have any quesions", () => {
+          this.showDialogueChoices([
+            {
+              text: "YES I DO",
+              action: () => {
+                this.renderDialogueLine('entity-b', "YES I DO", () => {
+                  audio.playClickSFX();
+                  setTimeout(() => {
+                    this.renderDialogueLine('entity-a', "okay, goodbye", () => {
+                      setTimeout(() => {
+                        const storyOverlay = document.getElementById('story-overlay');
+                        if (storyOverlay) storyOverlay.classList.remove('active');
+                        document.getElementById('menu-overlay').classList.add('active');
+                        this.state = 'MENU';
+                        this.updateInventoryUI();
+                        audio.stopMusic();
+                        audio.playTrack('soundtracks/menu.mp3', 100);
+                      }, 1800);
+                    });
+                  }, 800);
+                });
+              }
+            },
+            {
+              text: "NO I DON'T",
+              action: () => {
+                this.renderDialogueLine('entity-b', "NO I DON'T", () => {
+                  audio.playClickSFX();
+                  setTimeout(() => {
+                    this.renderDialogueLine('entity-a', "Guess you are not carious about the story?", () => {
+                      setTimeout(() => {
+                        this.showDialogueChoices([
+                          {
+                            text: "Yes",
+                            action: () => this.triggerFinalGoodbye("Yes")
+                          },
+                          {
+                            text: "YES",
+                            action: () => this.triggerFinalGoodbye("YES")
+                          },
+                          {
+                            text: "yes",
+                            action: () => this.triggerFinalGoodbye("yes")
+                          },
+                          {
+                            text: "YEEES",
+                            action: () => this.triggerFinalGoodbye("YEEES")
+                          }
+                        ]);
+                      }, 1000);
+                    });
+                  }, 1000);
+                });
+              }
+            }
+          ]);
+        });
+      }, 1000);
+    }
+  }
+
+  triggerFinalGoodbye(optionText) {
+    this.renderDialogueLine('entity-b', optionText, () => {
+      audio.playClickSFX();
+      setTimeout(() => {
+        this.renderDialogueLine('entity-a', "THEN, GOODBYE!", () => {
+          setTimeout(() => {
+            const storyOverlay = document.getElementById('story-overlay');
+            if (storyOverlay) storyOverlay.classList.remove('active');
+            
+            document.getElementById('menu-overlay').classList.add('active');
+            this.state = 'MENU';
+            this.updateInventoryUI();
+            audio.stopMusic();
+            audio.playTrack('soundtracks/menu.mp3', 100);
+          }, 2000);
+        });
+      }, 1000);
+    });
   }
 
   toggleSuperDebugCheat() {
@@ -836,7 +1415,7 @@ class GameApp {
     const subtitleEl = document.getElementById('victory-subtitle');
     const promptEl = document.getElementById('victory-prompt');
     
-    if (this.currentLevel === 7) {
+    if (this.currentLevel === 6) {
       if (titleEl) titleEl.textContent = "CAMPAIGN COMPLETE";
       if (subtitleEl) subtitleEl.textContent = "YOU CONQUERED ALL THREATS!";
       if (promptEl) promptEl.innerHTML = "REBOOTING CAMPAIGN IN <span id='victory-countdown'>3</span>...";
@@ -865,6 +1444,32 @@ class GameApp {
 
   update(dt) {
     if (this.state === 'PAUSED') return;
+
+    if (this.state === 'ENDING_STORY') {
+      if (this.endingStage === 'DIALOGUE' && this.isHoldingSpaceEnding) {
+        this.spaceHoldTimeEnding += dt;
+        const progressPercent = Math.min(100, (this.spaceHoldTimeEnding / 1.0) * 100);
+        const barInner = document.getElementById('dialogue-hold-bar-inner');
+        if (barInner) barInner.style.width = `${progressPercent}%`;
+        
+        if (this.spaceHoldTimeEnding >= 1.0) {
+          this.isHoldingSpaceEnding = false;
+          this.spaceHoldTimeEnding = 0;
+          if (barInner) barInner.style.width = '0%';
+          
+          const selectedChoice = this.activeDialogueChoices[this.dialogueSelectedChoiceIndex];
+          if (selectedChoice) {
+            this.activeDialogueChoices = [];
+            const dialogueChoices = document.getElementById('dialogue-choices');
+            const holdContainer = document.getElementById('dialogue-hold-container');
+            if (dialogueChoices) dialogueChoices.innerHTML = '';
+            if (holdContainer) holdContainer.style.display = 'none';
+            selectedChoice.action();
+          }
+        }
+      }
+      return;
+    }
 
     // 1. Process screen shake and hit stop timers
     screenShake.update(dt);
@@ -907,7 +1512,11 @@ class GameApp {
         
         // Check victory conditions
         if (this.boss.state === 'DEAD' && this.boss.stateTimer <= 0) {
-          this.spawnTreasureChest();
+          if (this.currentLevel === 6) {
+            this.triggerEndingStory();
+          } else {
+            this.spawnTreasureChest();
+          }
         }
       }
     } else if (this.state === 'CHEST_LOOT') {

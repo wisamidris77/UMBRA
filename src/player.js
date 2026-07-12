@@ -341,8 +341,8 @@ export class Player {
       return;
     }
     
-    // Calculate damage: base is 2, fully charged is 35 (quadratic scaling) + bonus upgrade damage
-    const dmg = Math.round(lerp(2, 35, Math.pow(this.chargePercent, 2))) + (this.bonusDamage || 0);
+    // Calculate damage: base is 2, fully charged is 20 (quadratic scaling) + bonus upgrade damage
+    const dmg = Math.round(lerp(2, 20, Math.pow(this.chargePercent, 2))) + (this.bonusDamage || 0);
     
     // Hit effects
     boss.takeDamage(dmg);

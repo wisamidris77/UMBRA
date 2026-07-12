@@ -553,6 +553,101 @@ class AudioEngine {
     this.laserLfo = null;
     this.laserGain = null;
   }
+
+  playNoteHitSFX() {
+    this.init();
+    this.resume();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(700 + Math.random() * 200, now);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  playClickSFX() {
+    this.init();
+    this.resume();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(400, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.08);
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.09);
+  }
+
+  playUpgradeSelectedSFX() {
+    this.init();
+    this.resume();
+    const now = this.ctx.currentTime;
+    [440, 554, 659].forEach((freq, index) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + index * 0.08);
+      gain.gain.setValueAtTime(0.2, now + index * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.08 + 0.25);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now + index * 0.08);
+      osc.stop(now + index * 0.08 + 0.26);
+    });
+  }
+
+  playPowerUpSFX() {
+    this.init();
+    this.resume();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(960, now + 0.7);
+    
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.3, now + 0.35);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, now);
+    filter.frequency.exponentialRampToValueAtTime(2200, now + 0.7);
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc.start(now);
+    osc.stop(now + 0.71);
+  }
+
+  playWaveSpawn() {
+    this.init();
+    this.resume();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(220, now + 0.28);
+    gain.gain.setValueAtTime(0.22, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.29);
+  }
 }
 
 export const audio = new AudioEngine();

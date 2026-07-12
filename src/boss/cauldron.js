@@ -37,11 +37,22 @@ export class AlchemicalCauldron extends Boss {
     this.phase1Sequence = [
       'ACID_SPLASH', 'RECOVERY',
       'CHEMICAL_VAPOR', 'RECOVERY',
-      'COLOR_SYNTHESIS', 'RECOVERY'
+      'ACID_SPLASH', 'RECOVERY',
+      'CHEMICAL_VAPOR', 'RECOVERY'
     ];
     
     this.phase2Sequence = [
+      'COLOR_SYNTHESIS', 'RECOVERY',
+      'TOXIC_GEYSER', 'RECOVERY',
+      'COMBINED_VAPOR_ACID', 'RECOVERY',
+      'ACID_SPLASH', 'RECOVERY',
+      'COLOR_SYNTHESIS', 'RECOVERY'
+    ];
+    
+    this.phase3Sequence = [
       'WOW_CORE_MELTDOWN', 'RECOVERY',
+      'PLASMA_ERUPTION', 'RECOVERY',
+      'TOXIC_GEYSER', 'RECOVERY',
       'COMBINED_VAPOR_ACID', 'RECOVERY',
       'COLOR_SYNTHESIS', 'RECOVERY'
     ];
@@ -62,12 +73,16 @@ export class AlchemicalCauldron extends Boss {
     super.reset();
     this.paddleAngle = 0;
     this.paddleSpeed = 1.6;
-    this.fluidColor = '#39ff14';
+    this.fluidColor = '#39ff14'; // neon green plasma boil
     this.bubbles = [];
     this.acidPools = [];
     this.vaporActive = false;
     this.vaporProgress = 0;
     this.meltdownActive = false;
+    this.toxicGeysers = [];
+    this.plasmaEruptions = [];
+    this.sloshX = 0;
+    this.sloshY = 0;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -81,16 +96,44 @@ export class AlchemicalCauldron extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 55) { // 25% of 220 maxHp
-      this.triggerPhaseTransition(2, 140); // Phase 2 has 140 HP
+    if (this.phase === 1 && this.hp <= 73) { // 33% of 220
+      this.triggerPhaseTransition(2, 180); // Phase 2 has 180 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-      this.paddleSpeed = 2.8; // spin paddles much faster!
+      this.paddleSpeed = 2.4; // spin paddles faster!
       this.fluidColor = '#ff00ff'; // change fluid color to magenta!
+    } else if (this.phase === 2 && this.hp <= 54) { // 30% of 180
+      this.triggerPhaseTransition(3, 280); // Phase 3 has 280 HP
+      this.activeSequence = this.phase3Sequence;
+      this.sequenceIndex = 0;
+      this.paddleSpeed = 3.6; // spin paddles at MAXIMUM velocity!
+      this.fluidColor = '#ff0033'; // change fluid color to neon orange-crimson!
     }
   }
 
+  activeAttackCleanup() {
+    this.acidPools = [];
+    this.vaporActive = false;
+    this.meltdownActive = false;
+    this.toxicGeysers = [];
+    this.plasmaEruptions = [];
+    const banner = document.getElementById('warning-banner');
+    if (banner) banner.classList.remove('active');
+  }
+
   update(dt, player) {
+    // Alchemical fluid sloshes towards the player
+    const dx = player.x - this.cx;
+    const dy = player.y - this.cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) {
+      this.sloshX = lerp(this.sloshX || 0, (dx / dist) * 7, 4 * dt);
+      this.sloshY = lerp(this.sloshY || 0, (dy / dist) * 7, 4 * dt);
+    } else {
+      this.sloshX = 0;
+      this.sloshY = 0;
+    }
+    
     super.update(dt, player);
     
     // Rotate mixer paddle
@@ -136,6 +179,8 @@ export class AlchemicalCauldron extends Boss {
     this.updateAcidPools(dt, player);
     this.updateVapor(dt, player);
     this.updateMeltdown(dt, player);
+    this.updateToxicGeysers(dt, player);
+    this.updatePlasmaEruptions(dt, player);
     
     this.stateTimer -= dt;
     
@@ -239,6 +284,39 @@ export class AlchemicalCauldron extends Boss {
           banner.classList.add('active');
         }
         break;
+
+      case 'TOXIC_GEYSER':
+        this.stateTimer = 1.2; // warning
+        this.toxicGeysers = [];
+        // Spawn 4 geyser targets along the player orbit (radius = 220)
+        for (let i = 0; i < 4; i++) {
+          const angle = (Math.PI / 2) * i + Math.random() * 0.4;
+          this.toxicGeysers.push({
+            angle: angle,
+            x: this.cx + Math.cos(angle) * 220,
+            y: this.cy + Math.sin(angle) * 220,
+            active: false,
+            radius: 35
+          });
+        }
+        if (banner) {
+          banner.textContent = "☣️ TOXIC GEYSER ERUPTION LOCK ☣️";
+          banner.style.color = '#39ff14';
+          banner.style.textShadow = '0 0 10px #39ff14';
+          banner.classList.add('active');
+        }
+        break;
+
+      case 'PLASMA_ERUPTION':
+        this.stateTimer = 1.0;
+        this.plasmaEruptions = [];
+        if (banner) {
+          banner.textContent = "☣️ THERMAL PLASMA ERUPTION ☣️";
+          banner.style.color = '#ff3300';
+          banner.style.textShadow = '0 0 10px #ff3300';
+          banner.classList.add('active');
+        }
+        break;
     }
   }
 
@@ -270,14 +348,21 @@ export class AlchemicalCauldron extends Boss {
       case 'WOW_CORE_MELTDOWN':
         this.stateTimer = 5.0; // Melt down lasts 5 seconds
         break;
+
+      case 'TOXIC_GEYSER':
+        this.stateTimer = 4.0;
+        this.toxicGeysers.forEach(tg => tg.active = true);
+        break;
+
+      case 'PLASMA_ERUPTION':
+        this.stateTimer = 4.0;
+        break;
     }
   }
 
   finishAttack() {
-    this.vaporActive = false;
-    this.meltdownActive = false;
-    this.fluidColor = '#39ff14'; // reset to green
-    
+    this.activeAttackCleanup();
+    this.fluidColor = this.phase === 3 ? '#ff0033' : (this.phase === 2 ? '#ff00ff' : '#39ff14');
     this.state = 'RECOVERY';
     this.stateTimer = this.recoveryDuration;
   }
@@ -332,10 +417,16 @@ export class AlchemicalCauldron extends Boss {
   }
 
   spawnSynthesisWave() {
-    // Fire orange bullets crossing center
+    let pAngle = 0;
+    const pEl = window.gameAppInstance?.player;
+    if (pEl) {
+      pAngle = Math.atan2(pEl.y - this.cy, pEl.x - this.cx);
+    }
+    
+    // Fire orange bullets crossing center, aligned with the player
     for (let i = 0; i < 8; i++) {
-      const angle = (Math.PI / 4) * i;
-      const speed = 2.0;
+      const angle = pAngle + (Math.PI / 4) * i;
+      const speed = 2.2;
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
       this.spawnBullet(this.cx, this.cy, vx, vy, 10, '#ff9d00');
@@ -360,6 +451,37 @@ export class AlchemicalCauldron extends Boss {
 
   draw(ctx) {
     super.draw(ctx);
+    
+    // Draw Toxic Geysers
+    if (this.toxicGeysers && this.toxicGeysers.length > 0) {
+      this.toxicGeysers.forEach(tg => {
+        ctx.save();
+        if (tg.active && this.state === 'ATTACK') {
+          // Geyser erupts!
+          const pulse = 1.0 + Math.sin(Date.now() * 0.02) * 0.15;
+          const grad = ctx.createRadialGradient(tg.x, tg.y, 5, tg.x, tg.y, tg.radius * pulse);
+          grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+          grad.addColorStop(0.3, 'rgba(57, 255, 20, 0.65)');
+          grad.addColorStop(1, 'rgba(57, 255, 20, 0)');
+          
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(tg.x, tg.y, tg.radius * pulse, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Warning circle
+          ctx.strokeStyle = 'rgba(57, 255, 20, 0.45)';
+          ctx.lineWidth = 2.5;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = '#39ff14';
+          ctx.setLineDash([4, 6]);
+          ctx.beginPath();
+          ctx.arc(tg.x, tg.y, tg.radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+    }
     
     // Draw Acid pools
     this.acidPools.forEach(p => {
@@ -419,6 +541,9 @@ export class AlchemicalCauldron extends Boss {
     // --- Draw Mixer Paddle Shield (Mixer blade) ---
     if (this.state !== 'DEAD' && this.state !== 'TRANSITION') {
       ctx.save();
+      // Translate to align with the cauldron's slosh tracking
+      ctx.translate(this.sloshX || 0, this.sloshY || 0);
+      
       ctx.strokeStyle = '#39ff14';
       ctx.lineWidth = 6;
       ctx.shadowBlur = 12;
@@ -450,6 +575,9 @@ export class AlchemicalCauldron extends Boss {
       ctx.scale(this.transitionScale, this.transitionScale);
     }
     ctx.translate(-this.cx, -this.cy);
+    
+    // Slosh/shift dynamically towards player
+    ctx.translate(this.sloshX || 0, this.sloshY || 0);
     
     const dynamicRadius = this.radius * this.visualScale;
     
@@ -497,5 +625,39 @@ export class AlchemicalCauldron extends Boss {
     });
     
     ctx.restore();
+  }
+
+  updateToxicGeysers(dt, player) {
+    if (this.state !== 'ATTACK') return;
+    this.toxicGeysers.forEach(tg => {
+      if (tg.active && player.state !== 'DEAD') {
+        const dist = getDistance(tg.x, tg.y, player.x, player.y);
+        if (dist < tg.radius + player.radius) {
+          player.takeDamage();
+        }
+      }
+    });
+  }
+
+  updatePlasmaEruptions(dt, player) {
+    if (this.targetAttack !== 'PLASMA_ERUPTION' || this.state !== 'ATTACK') return;
+    
+    this.plasmaTimer = (this.plasmaTimer || 0) + dt;
+    if (this.plasmaTimer >= 0.58) {
+      this.plasmaTimer = 0;
+      let pAngle = 0;
+      if (player) {
+        pAngle = Math.atan2(player.y - this.cy, player.x - this.cx);
+      }
+      // Fire concentric ring of 6 plasma fireballs pointing at player
+      for (let i = 0; i < 6; i++) {
+        const angle = pAngle + (Math.PI * 2 / 6) * i;
+        const speed = 2.45;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        this.spawnBullet(this.cx, this.cy, vx, vy, 8, '#ff3300');
+      }
+      audio.playBossShoot();
+    }
   }
 }

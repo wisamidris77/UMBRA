@@ -35,8 +35,8 @@ export class MechanicalEye extends Boss {
     
     // Sequences - Simplified for beginner tutorial level
     this.phase1Sequence = ['TRIPLE_SHOT', 'RECOVERY'];
-    this.phase2Sequence = ['TRIPLE_SHOT', 'RECOVERY', 'LASER_SWEEP', 'RECOVERY'];
-    this.finalSequence = ['TRIPLE_SHOT', 'RECOVERY', 'LASER_SWEEP', 'RECOVERY', 'ORBIT_MINES', 'RECOVERY'];
+    this.phase2Sequence = ['LASER_SWEEP', 'RECOVERY', 'ORBIT_MINES', 'RECOVERY', 'TRIPLE_SHOT', 'RECOVERY'];
+    this.finalSequence = [];
     
     this.maxHp = 100;
     this.hp = 100;
