@@ -29,8 +29,11 @@ const MIME_TYPES = {
 const server = http.createServer((req, res) => {
   console.log(`${req.method} ${req.url}`);
 
+  // Strip query parameters and hash from request URL
+  const urlPath = req.url.split('?')[0].split('#')[0];
+
   // Normalize URL path to prevent directory traversal
-  let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
+  let filePath = path.join(__dirname, urlPath === '/' ? 'index.html' : urlPath);
 
   // Get file extension
   const ext = path.extname(filePath).toLowerCase();

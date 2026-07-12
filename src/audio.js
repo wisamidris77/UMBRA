@@ -30,6 +30,9 @@ class AudioEngine {
     
     // Dynamic intensity state for music syncing
     this.intensityState = 'IDLE'; // 'IDLE', 'TELEGRAPH', 'ATTACK', 'RECOVERY', 'WOW'
+    
+    // Store tracks scheduled to play before the AudioContext is resumed/gesture-enabled
+    this.pendingTrack = null;
   }
 
   init() {
@@ -46,8 +49,19 @@ class AudioEngine {
 
   resume() {
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      return this.ctx.resume().then(() => {
+        if (this.pendingTrack) {
+          const { url, bpm } = this.pendingTrack;
+          this.pendingTrack = null;
+          this.playTrack(url, bpm);
+        }
+      });
+    } else if (this.pendingTrack) {
+      const { url, bpm } = this.pendingTrack;
+      this.pendingTrack = null;
+      this.playTrack(url, bpm);
     }
+    return Promise.resolve();
   }
 
   setBPM(bpm) {
@@ -361,7 +375,13 @@ class AudioEngine {
 
   playTrack(url, bpm) {
     this.init();
-    this.resume();
+    
+    // If context is suspended (blocked by browser autoplay), store as pending and return.
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.pendingTrack = { url, bpm };
+      return;
+    }
+    
     this.stopMusic();
     
     const buffer = this.loadedBuffers[url];

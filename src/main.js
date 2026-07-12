@@ -279,6 +279,7 @@ class GameApp {
     this.hasInteracted = true;
     
     audio.init();
+    audio.resume();
     
     const prompt = document.getElementById('audio-prompt');
     if (prompt) {

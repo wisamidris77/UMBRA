@@ -7,6 +7,7 @@
 import { Boss } from './boss.js';
 import { lerp, clamp, getDistance, checkCircleLineCollision } from '../utils.js';
 import { particles } from '../particle.js';
+import { audio } from '../audio.js';
 
 export class MechanicalEye extends Boss {
   constructor(cx, cy) {
