@@ -51,6 +51,13 @@
         </span>
       </div>
 
+      <!-- Pause Toggle Button inside HUD -->
+      <button id="btn-pause-toggle" class="pause-hud-btn" title="Pause Game (ESC / P)" aria-label="Pause Game">
+        <svg viewBox="0 0 24 24" width="16" height="16">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/>
+        </svg>
+      </button>
+
       <!-- Boss HP Container -->
       <div id="boss-hp-container">
         <div id="boss-name">THE MECHANICAL EYE</div>
@@ -68,23 +75,63 @@
 
     <!-- Menu Overlay (Start / Welcome) -->
     <div id="menu-overlay" class="overlay active">
-      <div class="overlay-content">
-        <!-- Animated Eclipse/Umbra Visual -->
-        <div class="umbra-eclipse">
-          <div class="corona-ring"></div>
-          <div class="umbra-shadow"></div>
-        </div>
-        
-        <h1 class="game-title">UMBRA</h1>
-        <p class="game-subtitle">ORBITAL BOUND CAMPAIGN</p>
-        
-        <div class="control-help">
-          <p><strong>CONTROLS:</strong> Tap <kbd>SPACEBAR</kbd> or <kbd>LEFT MOUSE CLICK</kbd> to reverse orbit.</p>
-          <p>Hold to freeze & charge. Release to dash and attack the Boss.</p>
-        </div>
+      <div class="overlay-content" style="max-width: 850px; width: 95%;">
+        <div class="menu-grid">
+          <!-- Left Column: Title & Main Visual -->
+          <div class="menu-col-left">
+            <div class="umbra-eclipse">
+              <div class="corona-ring"></div>
+              <div class="umbra-shadow"></div>
+            </div>
+            <h1 class="game-title" style="margin-top: 15px;">UMBRA</h1>
+            <p class="game-subtitle">ORBITAL BOUND CAMPAIGN</p>
+            <div class="welcome-action text-blink" style="margin-top: 25px;">
+              CLICK OR PRESS SPACE TO START
+            </div>
+            <div class="menu-sector-picker-container" style="margin-top: 20px; z-index: 10;">
+              <label for="menu-sector-select" style="font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 5px;">Starting Sector:</label>
+              <select id="menu-sector-select" style="background: rgba(0, 0, 0, 0.85); color: #00f3ff; border: 1.5px solid #00f3ff; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-family: 'Outfit', monospace; cursor: pointer; text-shadow: 0 0 5px #00f3ff; outline: none; width: 220px; text-align: center;">
+                <option value="1">Sector 1: Mechanical Eye</option>
+                <option value="2">Sector 2: Crystal Titan</option>
+                <option value="3">Sector 3: Clockwork Conductor</option>
+                <option value="4">Sector 4: Solar Phoenix</option>
+                <option value="5">Sector 5: Shadow Weaver</option>
+                <option value="6">Sector 6: Void Singularity</option>
+                <option value="7">Sector 7: Alchemical Cauldron</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Right Column: Info & Configurations -->
+          <div class="menu-col-right">
+            <div class="control-help" style="margin-bottom: 5px;">
+              <p><strong>CONTROLS:</strong> Tap <kbd>SPACE</kbd> or <kbd>CLICK</kbd> to reverse orbit.</p>
+              <p>Hold to freeze & charge. Release to dash and attack the Boss.</p>
+            </div>
 
-        <div class="welcome-action text-blink">
-          CLICK OR PRESS SPACE TO START
+            <!-- Audio Settings Panel -->
+            <div class="settings-panel">
+              <div class="settings-title">AUDIO SETTINGS</div>
+              <div class="setting-row">
+                <label for="music-volume">Music Volume</label>
+                <input type="range" id="music-volume" min="0" max="1" step="0.05" value="0.7">
+                <span id="music-volume-val">70%</span>
+              </div>
+              <div class="setting-row">
+                <label for="sfx-volume">SFX Volume</label>
+                <input type="range" id="sfx-volume" min="0" max="1" step="0.05" value="0.7">
+                <span id="sfx-volume-val">70%</span>
+              </div>
+            </div>
+
+            <!-- Upgrades Inventory Panel -->
+            <div id="inventory-panel" class="settings-panel" style="display: none;">
+              <div class="settings-title">UPGRADES INVENTORY</div>
+              <div id="inventory-list" class="inventory-grid">
+                <!-- Populate dynamically -->
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -104,6 +151,69 @@
         <h1 class="text-neon-cyan">TARGET ELIMINATED</h1>
         <p class="game-subtitle" id="victory-subtitle">VICTORY ACHIEVED</p>
         <p class="countdown-text" id="victory-prompt">PROCEEDING IN <span id="victory-countdown">3</span>...</p>
+      </div>
+    </div>
+
+    <!-- Loot/Upgrade Selection Overlay -->
+    <div id="loot-overlay" class="overlay">
+      <div class="overlay-content" style="max-width: 800px;">
+        <h1 class="text-neon-cyan" style="font-size: 38px; letter-spacing: 6px;">CHEST SECURED</h1>
+        <p class="game-subtitle">CHOOSE ONE UPGRADE GEAR</p>
+        
+        <!-- Loot Choices Grid -->
+        <div id="loot-choices" class="loot-choices-grid">
+          <!-- Dynamically populated card slots -->
+        </div>
+
+        <!-- Hold Spacebar Progress Bar -->
+        <div id="loot-hold-container" style="display: flex; flex-direction: column; align-items: center; margin-top: 20px;">
+          <div style="width: 240px; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div id="loot-hold-bar-inner" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta)); box-shadow: 0 0 10px var(--neon-cyan); transition: width 0.05s linear;"></div>
+          </div>
+          <p style="font-size: 10px; opacity: 0.7; margin-top: 8px; font-family: 'Share Tech Mono', monospace; letter-spacing: 1.5px; text-transform: uppercase;">
+            [SPACE] Cycle Gear &bull; Hold [SPACE] to Install
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div id="pause-overlay" class="overlay">
+      <div class="overlay-content">
+        <h1 class="text-neon-orange" style="font-size: 48px; letter-spacing: 8px;">SYSTEM PAUSED</h1>
+        <p class="game-subtitle">CHRONO-LOCK ACTIVE</p>
+        
+        <!-- Audio Settings Panel -->
+        <div class="settings-panel">
+          <div class="settings-title">AUDIO SETTINGS</div>
+          <div class="setting-row">
+            <label for="music-volume-pause">Music Volume</label>
+            <input type="range" id="music-volume-pause" min="0" max="1" step="0.05" value="0.7">
+            <span id="music-volume-pause-val">70%</span>
+          </div>
+          <div class="setting-row">
+            <label for="sfx-volume-pause">SFX Volume</label>
+            <input type="range" id="sfx-volume-pause" min="0" max="1" step="0.05" value="0.7">
+            <span id="sfx-volume-pause-val">70%</span>
+          </div>
+        </div>
+
+        <!-- Upgrades Inventory Panel -->
+        <div id="pause-inventory-panel" class="settings-panel" style="display: none;">
+          <div class="settings-title">UPGRADES INVENTORY</div>
+          <div id="pause-inventory-list" class="inventory-grid">
+            <!-- Populate dynamically -->
+          </div>
+        </div>
+
+        <div class="pause-actions">
+          <button id="btn-resume-game" class="btn-glow">RESUME</button>
+          <button id="btn-restart-game" class="btn-glow" style="border-color: var(--neon-red); box-shadow: 0 0 15px rgba(255, 0, 85, 0.15);">RESTART</button>
+        </div>
+        
+        <p class="control-help" style="margin-top: 20px; font-size: 11px; opacity: 0.6;">
+          Press <kbd>ESC</kbd> or <kbd>P</kbd> to resume
+        </p>
       </div>
     </div>
 
@@ -134,9 +244,16 @@
       <div class="debug-row"><span>FPS:</span> <span id="debug-fps">60</span></div>
       <div class="debug-row"><label><input type="checkbox" id="debug-hitboxes"> Show Hitboxes</label></div>
       <div class="debug-row">
-        <button id="debug-btn-toggle-boss" style="padding: 2px 5px; font-size: 10px; background: #333; color: #0f0; border: 1px solid #0f0; cursor: pointer;">
-          Switch Boss
-        </button>
+        <label for="debug-sector-select" style="font-size: 10px; display: block; margin-bottom: 2px;">Sector:</label>
+        <select id="debug-sector-select" style="background: #222; color: #0f0; border: 1px solid #0f0; padding: 2px; font-size: 10px; cursor: pointer; width: 100%; font-family: monospace;">
+          <option value="1">Sector 1: Eye</option>
+          <option value="2">Sector 2: Titan</option>
+          <option value="3">Sector 3: Conductor</option>
+          <option value="4">Sector 4: Phoenix</option>
+          <option value="5">Sector 5: Weaver</option>
+          <option value="6">Sector 6: Singularity</option>
+          <option value="7">Sector 7: Cauldron</option>
+        </select>
       </div>
     </div>
   </div>

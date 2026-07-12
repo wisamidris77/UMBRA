@@ -48,23 +48,15 @@ export class CrystalTitan extends Boss {
     ];
     
     this.phase2Sequence = [
-      'SAFE_SLICE', 'RECOVERY',
-      'CRYSTAL_SPEARS', 'RECOVERY',
-      'BOOMERANGS', 'RECOVERY',
-      'CRYSTAL_SLAM', 'RECOVERY',
-      'COMBINED_BOOMERANGS_SLICE', 'RECOVERY',
-      'COMBINED_SPEARS_BOOMERANGS', 'RECOVERY'
-    ];
-    
-    this.finalSequence = [
       'WOW_SHATTERED_DIMENSION', 'RECOVERY',
       'COMBINED_BOOMERANGS_SLICE', 'RECOVERY',
-      'CRYSTAL_SLAM', 'RECOVERY',
       'COMBINED_SPEARS_BOOMERANGS', 'RECOVERY'
     ];
     
-    this.maxHp = 300;
-    this.hp = 300;
+    this.finalSequence = [];
+    
+    this.maxHp = 120;
+    this.hp = 120;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -101,19 +93,38 @@ export class CrystalTitan extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp < 60) {
-      this.triggerPhaseTransition(2, "CRYSTALS SHATTERING: PHASE 2");
+    if (this.phase === 1 && this.hp <= 30) { // 25% of 120 maxHp
+      this.triggerPhaseTransition(2, 80); // Phase 2 has 80 HP (quick, fun!)
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-    } else if (this.phase === 2 && this.hp < 30) {
-      this.triggerPhaseTransition(3, "DIMENSIONAL CRACK: FINAL PHASE");
-      this.activeSequence = this.finalSequence;
-      this.sequenceIndex = 0;
+      this.color = '#ffcc00'; // Core color changes to gold!
+      this.orbitingCrystals = 6; // Double the orbiting crystals shield!
     }
+  }
+
+  activeAttackCleanup() {
+    this.spears = [];
+    this.boomerangs = [];
+    this.slamActive = false;
+    this.sliceWarningActive = false;
+    const banner = document.getElementById('warning-banner');
+    if (banner) banner.classList.remove('active');
   }
 
   update(dt, player) {
     super.update(dt, player);
+    
+    // Core tracking player (looks/leans at player)
+    const dx = player.x - this.cx;
+    const dy = player.y - this.cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) {
+      this.coreX = (dx / dist) * 8;
+      this.coreY = (dy / dist) * 8;
+    } else {
+      this.coreX = 0;
+      this.coreY = 0;
+    }
     
     // Slow elegant rotation of crystal core
     this.coreRotation += 0.4 * dt;
@@ -209,7 +220,18 @@ export class CrystalTitan extends Boss {
         this.sliceWarning = true; // Show early telegraph warning!
         this.sliceActive = false;
         this.sliceRadius = 0;
-        this.sliceRotation = Math.random() * Math.PI * 2;
+        
+        // Target safe segment close to player
+        let pAngle = 0;
+        const pEl = window.gameAppInstance?.player;
+        if (pEl) {
+          pAngle = Math.atan2(pEl.y - this.cy, pEl.x - this.cx);
+        } else {
+          pAngle = Math.random() * Math.PI * 2;
+        }
+        const sOffset = (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.25);
+        this.sliceRotation = pAngle + sOffset - Math.PI / 6;
+
         if (banner) {
           banner.textContent = "SEGMENT WAVE LOCK";
           banner.style.color = '#ff00ff';
@@ -245,7 +267,18 @@ export class CrystalTitan extends Boss {
         this.sliceWarning = true; // Show early telegraph warning!
         this.sliceActive = false;
         this.sliceRadius = 0;
-        this.sliceRotation = Math.random() * Math.PI * 2;
+        
+        // Target safe segment close to player
+        let pAngleCombo = 0;
+        const pElCombo = window.gameAppInstance?.player;
+        if (pElCombo) {
+          pAngleCombo = Math.atan2(pElCombo.y - this.cy, pElCombo.x - this.cx);
+        } else {
+          pAngleCombo = Math.random() * Math.PI * 2;
+        }
+        const sOffsetCombo = (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.25);
+        this.sliceRotation = pAngleCombo + sOffsetCombo - Math.PI / 6;
+
         if (banner) {
           banner.textContent = "BARRIER SPECTRUM OVERLOAD";
           banner.style.color = '#ff0055';
@@ -542,17 +575,13 @@ export class CrystalTitan extends Boss {
         const playerAngle = Math.atan2(player.y - this.cy, player.x - this.cx);
         let diff = playerAngle - this.sliceRotation;
         
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
+        // Normalize diff to [0, 2*PI)
+        diff = (diff % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
         
-        // 6 segments total (each 60 degrees = 1.047 rad)
-        // Segment index [0, 5]
-        const normalizedDiff = (diff + Math.PI) % (Math.PI * 2);
-        const segmentIdx = Math.floor(normalizedDiff / (Math.PI / 3));
-        
-        // Let's declare Segment 0 as SAFE (which is opposite to rotation start)
-        // If segmentIdx is not 0 (the safe slice), player takes damage!
-        if (segmentIdx !== 0) {
+        // Safe segment is at segment 0 [0, Math.PI / 3]
+        // Allow a generous 0.15 radians safety buffer on both sides of the safe slice
+        const isSafe = (diff <= (Math.PI / 3) + 0.15) || (diff >= Math.PI * 2 - 0.15);
+        if (!isSafe) {
           player.takeDamage();
         }
       }
@@ -717,6 +746,20 @@ export class CrystalTitan extends Boss {
     // --- Draw Main Crystal Titan Core ---
     ctx.save();
     
+    // Apply phase transition or death spin/scale transformations
+    ctx.translate(this.cx, this.cy);
+    if (this.state === 'DEAD') {
+      ctx.rotate(this.deathRotation);
+      ctx.scale(this.deathScale, this.deathScale);
+    } else if (this.state === 'TRANSITION') {
+      ctx.rotate(this.transitionRotation);
+      ctx.scale(this.transitionScale, this.transitionScale);
+    }
+    ctx.translate(-this.cx, -this.cy);
+    
+    // Leaning player-tracking translate (boss looks/leans towards player)
+    ctx.translate(this.coreX || 0, this.coreY || 0);
+    
     const dynamicRadius = this.radius * this.visualScale;
     
     // Hit flash translate shake
@@ -762,43 +805,97 @@ export class CrystalTitan extends Boss {
       return;
     }
     
-    // Draw Elegant Hexagonal Crystalline Core
-    ctx.strokeStyle = '#ff00ff';
+    // Draw Elegant Crystalline Core (Hexagon in P1, 8-pointed Star in P2)
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 4;
-    ctx.fillStyle = '#0f0212';
+    ctx.fillStyle = this.phase === 2 ? '#1a1400' : '#0f0212';
     ctx.shadowBlur = dynamicRadius * 0.55;
-    ctx.shadowColor = '#ff00ff';
+    ctx.shadowColor = this.color;
     
     ctx.beginPath();
-    // 6-sided crystal polygon shape
-    for (let i = 0; i < 6; i++) {
-      const angle = this.coreRotation + (Math.PI / 3) * i;
-      const px = this.cx + Math.cos(angle) * dynamicRadius;
-      const py = this.titanY + Math.sin(angle) * dynamicRadius;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+    if (this.phase === 2) {
+      // 8-pointed star core morph
+      const points = 8;
+      for (let i = 0; i < points * 2; i++) {
+        const angle = this.coreRotation + (Math.PI / points) * i;
+        const r = i % 2 === 0 ? dynamicRadius : dynamicRadius * 0.45;
+        const px = this.cx + Math.cos(angle) * r;
+        const py = this.titanY + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+    } else {
+      // 6-sided crystal polygon shape
+      for (let i = 0; i < 6; i++) {
+        const angle = this.coreRotation + (Math.PI / 3) * i;
+        const px = this.cx + Math.cos(angle) * dynamicRadius;
+        const py = this.titanY + Math.sin(angle) * dynamicRadius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
     }
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
     
+    // Draw tracking crystal eyes inside the core!
+    ctx.save();
+    ctx.fillStyle = this.phase === 2 ? '#ffcc00' : '#ff00ff';
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = this.phase === 2 ? '#ffcc00' : '#ff00ff';
+    
+    const eyeOffset = { x: (this.coreX || 0) * 0.8, y: (this.coreY || 0) * 0.8 };
+    
+    // Left eye (glowing diamond)
+    ctx.beginPath();
+    ctx.moveTo(this.cx - 9 + eyeOffset.x, this.titanY - 3 + eyeOffset.y);
+    ctx.lineTo(this.cx - 6 + eyeOffset.x, this.titanY + eyeOffset.y);
+    ctx.lineTo(this.cx - 9 + eyeOffset.x, this.titanY + 3 + eyeOffset.y);
+    ctx.lineTo(this.cx - 12 + eyeOffset.x, this.titanY + eyeOffset.y);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Right eye (glowing diamond)
+    ctx.beginPath();
+    ctx.moveTo(this.cx + 9 + eyeOffset.x, this.titanY - 3 + eyeOffset.y);
+    ctx.lineTo(this.cx + 12 + eyeOffset.x, this.titanY + eyeOffset.y);
+    ctx.lineTo(this.cx + 9 + eyeOffset.x, this.titanY + 3 + eyeOffset.y);
+    ctx.lineTo(this.cx + 6 + eyeOffset.x, this.titanY + eyeOffset.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    
     // Internal geometric crystal lattice lines
-    ctx.strokeStyle = 'rgba(255, 0, 255, 0.25)';
+    ctx.strokeStyle = this.phase === 2 ? 'rgba(255, 204, 0, 0.25)' : 'rgba(255, 0, 255, 0.25)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = this.coreRotation + (Math.PI / 3) * i;
-      const px = this.cx + Math.cos(angle) * dynamicRadius;
-      const py = this.titanY + Math.sin(angle) * dynamicRadius;
-      ctx.moveTo(this.cx, this.titanY);
-      ctx.lineTo(px, py);
-      
-      // Connect to adjacent
-      const nextAngle = this.coreRotation + (Math.PI / 3) * ((i + 2) % 6);
-      const nx = this.cx + Math.cos(nextAngle) * dynamicRadius;
-      const ny = this.titanY + Math.sin(nextAngle) * dynamicRadius;
-      ctx.moveTo(px, py);
-      ctx.lineTo(nx, ny);
+    
+    if (this.phase === 2) {
+      const points = 8;
+      for (let i = 0; i < points * 2; i++) {
+        const angle = this.coreRotation + (Math.PI / points) * i;
+        const r = i % 2 === 0 ? dynamicRadius : dynamicRadius * 0.45;
+        const px = this.cx + Math.cos(angle) * r;
+        const py = this.titanY + Math.sin(angle) * r;
+        
+        ctx.moveTo(this.cx, this.titanY);
+        ctx.lineTo(px, py);
+      }
+    } else {
+      for (let i = 0; i < 6; i++) {
+        const angle = this.coreRotation + (Math.PI / 3) * i;
+        const px = this.cx + Math.cos(angle) * dynamicRadius;
+        const py = this.titanY + Math.sin(angle) * dynamicRadius;
+        ctx.moveTo(this.cx, this.titanY);
+        ctx.lineTo(px, py);
+        
+        // Connect to adjacent
+        const nextAngle = this.coreRotation + (Math.PI / 3) * ((i + 2) % 6);
+        const nx = this.cx + Math.cos(nextAngle) * dynamicRadius;
+        const ny = this.titanY + Math.sin(nextAngle) * dynamicRadius;
+        ctx.moveTo(px, py);
+        ctx.lineTo(nx, ny);
+      }
     }
     ctx.stroke();
     

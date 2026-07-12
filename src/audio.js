@@ -33,6 +33,12 @@ class AudioEngine {
     
     // Store tracks scheduled to play before the AudioContext is resumed/gesture-enabled
     this.pendingTrack = null;
+
+    // Volume parameters and persistence
+    this.musicVolume = parseFloat(localStorage.getItem('orbital_bound_music_vol') ?? '0.7');
+    this.sfxVolume = parseFloat(localStorage.getItem('orbital_bound_sfx_vol') ?? '0.7');
+    this.musicGain = null;
+    this.sfxGain = null;
   }
 
   init() {
@@ -45,6 +51,15 @@ class AudioEngine {
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.setValueAtTime(0.3, this.ctx.currentTime); // Master volume limit
     this.masterGain.connect(this.ctx.destination);
+
+    // Sub-gain nodes for Music and SFX volume control
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
+    this.musicGain.connect(this.masterGain);
+
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
+    this.sfxGain.connect(this.masterGain);
   }
 
   resume() {
@@ -62,6 +77,24 @@ class AudioEngine {
       this.playTrack(url, bpm);
     }
     return Promise.resolve();
+  }
+
+  setMusicVolume(vol) {
+    // Clamp to 0..1
+    this.musicVolume = Math.max(0, Math.min(1, vol));
+    localStorage.setItem('orbital_bound_music_vol', this.musicVolume.toString());
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
+    }
+  }
+
+  setSfxVolume(vol) {
+    // Clamp to 0..1
+    this.sfxVolume = Math.max(0, Math.min(1, vol));
+    localStorage.setItem('orbital_bound_sfx_vol', this.sfxVolume.toString());
+    if (this.sfxGain && this.ctx) {
+      this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
+    }
   }
 
   setBPM(bpm) {
@@ -106,7 +139,7 @@ class AudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
     
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain);
     
     osc.start(now);
     osc.stop(now + 0.16);
@@ -143,7 +176,7 @@ class AudioEngine {
     lfoGain.connect(this.chargeOsc.frequency);
     
     this.chargeOsc.connect(this.chargeGain);
-    this.chargeGain.connect(this.masterGain);
+    this.chargeGain.connect(this.sfxGain);
     
     this.chargeLfo.start(now);
     this.chargeOsc.start(now);
@@ -209,7 +242,7 @@ class AudioEngine {
     
     noise.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
+    noiseGain.connect(this.sfxGain);
     
     // 2. Heavy low-pitched pulse
     const synth = this.ctx.createOscillator();
@@ -222,7 +255,7 @@ class AudioEngine {
     synthGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
     
     synth.connect(synthGain);
-    synthGain.connect(this.masterGain);
+    synthGain.connect(this.sfxGain);
     
     noise.start(now);
     synth.start(now);
@@ -250,7 +283,7 @@ class AudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
     
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain);
     
     osc.start(now);
     osc.stop(now + 0.3);
@@ -275,7 +308,7 @@ class AudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
     
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxGain);
     
     osc.start(now);
     osc.stop(now + 0.26);
@@ -301,7 +334,7 @@ class AudioEngine {
     lowGain.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
     
     lowOsc.connect(lowGain);
-    lowGain.connect(this.masterGain);
+    lowGain.connect(this.sfxGain);
     
     // Massive noise crash
     const noise = this.ctx.createBufferSource();
@@ -318,7 +351,7 @@ class AudioEngine {
     
     noise.connect(filter);
     filter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
+    noiseGain.connect(this.sfxGain);
     
     lowOsc.start(now);
     noise.start(now);
@@ -396,7 +429,7 @@ class AudioEngine {
     this.musicSource = this.ctx.createBufferSource();
     this.musicSource.buffer = buffer;
     this.musicSource.loop = true;
-    this.musicSource.connect(this.masterGain);
+    this.musicSource.connect(this.musicGain);
     this.musicSource.start(0);
     
     // Start beat callbacks simulation based on BPM
@@ -448,7 +481,7 @@ class AudioEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
       
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(this.sfxGain);
       
       osc.start(time);
       osc.stop(time + 0.09);
@@ -486,7 +519,7 @@ class AudioEngine {
     
     this.laserOsc.connect(filter);
     filter.connect(this.laserGain);
-    this.laserGain.connect(this.masterGain);
+    this.laserGain.connect(this.sfxGain);
     
     lfo.start(now);
     this.laserOsc.start(now);

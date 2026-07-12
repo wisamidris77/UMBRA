@@ -41,20 +41,15 @@ export class ClockworkConductor extends Boss {
     ];
     
     this.phase2Sequence = [
-      'METRONOME_SWEEPS', 'RECOVERY',
-      'NOTE_BARRAGE', 'RECOVERY',
-      'TEMPO_SHIFT', 'RECOVERY',
-      'COMBINED_NOTE_SWEEPS', 'RECOVERY'
-    ];
-    
-    this.finalSequence = [
       'WOW_GRAND_FINALE', 'RECOVERY',
       'COMBINED_NOTE_SWEEPS', 'RECOVERY',
       'TEMPO_SHIFT', 'RECOVERY'
     ];
     
-    this.maxHp = 450;
-    this.hp = 450;
+    this.finalSequence = [];
+    
+    this.maxHp = 140;
+    this.hp = 140;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -86,19 +81,36 @@ export class ClockworkConductor extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp < 65) {
-      this.triggerPhaseTransition(2, "GEARS OVERHEATING: PHASE 2");
+    if (this.phase === 1 && this.hp <= 35) { // 25% of 140 maxHp
+      this.triggerPhaseTransition(2, 90); // Phase 2 has 90 HP (snappy climax!)
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-    } else if (this.phase === 2 && this.hp < 35) {
-      this.triggerPhaseTransition(3, "ABSOLUTE TEMPO: FINAL PHASE");
-      this.activeSequence = this.finalSequence;
-      this.sequenceIndex = 0;
+      this.color = '#39ff14'; // Color shifts to electric green!
     }
+  }
+
+  activeAttackCleanup() {
+    this.notes = [];
+    this.metronomeActive = false;
+    this.metronomeSweeps = [];
+    this.stavesActive = false;
+    this.staves = [];
+    const banner = document.getElementById('warning-banner');
+    if (banner) banner.classList.remove('active');
   }
 
   update(dt, player) {
     super.update(dt, player);
+    
+    // Conductor eyes tracking player
+    const dx = player.x - this.cx;
+    const dy = player.y - this.cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) {
+      this.eyeOffset = { x: (dx / dist) * 2.5, y: (dy / dist) * 2.5 };
+    } else {
+      this.eyeOffset = { x: 0, y: 0 };
+    }
     
     // Constant background gear rotation
     this.gearRotation += 0.8 * dt;
@@ -539,6 +551,17 @@ export class ClockworkConductor extends Boss {
     // --- Draw Main Clockwork Conductor Core ---
     ctx.save();
     
+    // Apply phase transition or death spin/scale transformations
+    ctx.translate(this.cx, this.cy);
+    if (this.state === 'DEAD') {
+      ctx.rotate(this.deathRotation);
+      ctx.scale(this.deathScale, this.deathScale);
+    } else if (this.state === 'TRANSITION') {
+      ctx.rotate(this.transitionRotation);
+      ctx.scale(this.transitionScale, this.transitionScale);
+    }
+    ctx.translate(-this.cx, -this.cy);
+    
     const dynamicRadius = this.radius * this.visualScale;
     
     // Hit flash translation shake
@@ -582,23 +605,51 @@ export class ClockworkConductor extends Boss {
       return;
     }
     
+    // If phase is 2, draw a second outer concentric spiked gear! (Counter-rotating)
+    if (this.phase === 2) {
+      ctx.save();
+      ctx.translate(this.cx, this.cy);
+      ctx.rotate(-this.gearRotation * 1.4); // spin opposite direction!
+      ctx.fillStyle = '#061705';
+      ctx.strokeStyle = '#39ff14';
+      ctx.shadowBlur = dynamicRadius * 0.4;
+      ctx.shadowColor = '#39ff14';
+      ctx.lineWidth = 3.5;
+      
+      const outerRadius = dynamicRadius + 22;
+      const teethCount2 = 12;
+      ctx.beginPath();
+      for (let i = 0; i < teethCount2 * 2; i++) {
+        const angle = (Math.PI * 2 / (teethCount2 * 2)) * i;
+        const r = i % 2 === 0 ? outerRadius : Math.max(0.1, outerRadius - 10);
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw Main Clockwork Gear Core
     ctx.save();
     ctx.translate(this.cx, this.cy);
     ctx.rotate(this.gearRotation);
     
-    ctx.fillStyle = '#1a1803';
-    ctx.strokeStyle = '#ffd700';
+    ctx.fillStyle = this.phase === 2 ? '#071403' : '#1a1803';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 4;
     ctx.shadowBlur = dynamicRadius * 0.5;
-    ctx.shadowColor = '#ffd700';
+    ctx.shadowColor = this.color;
     
     // Draw Gear teeth
     const teethCount = 8;
     ctx.beginPath();
     for (let i = 0; i < teethCount * 2; i++) {
       const angle = (Math.PI * 2 / (teethCount * 2)) * i;
-      const r = i % 2 === 0 ? dynamicRadius : dynamicRadius - 10;
+      const r = i % 2 === 0 ? dynamicRadius : Math.max(0.1, dynamicRadius - 10);
       const x = Math.cos(angle) * r;
       const y = Math.sin(angle) * r;
       if (i === 0) ctx.moveTo(x, y);
@@ -609,10 +660,10 @@ export class ClockworkConductor extends Boss {
     ctx.stroke();
     
     // Inner gear holes/rings
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.35)';
+    ctx.strokeStyle = this.phase === 2 ? 'rgba(57, 255, 20, 0.35)' : 'rgba(255, 215, 0, 0.35)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, dynamicRadius - 20, 0, Math.PI * 2);
+    ctx.arc(0, 0, Math.max(0.1, dynamicRadius - 20), 0, Math.PI * 2);
     ctx.stroke();
     
     // Gear spokes
@@ -624,13 +675,24 @@ export class ClockworkConductor extends Boss {
     }
     ctx.stroke();
     
-    // Inner center cap
-    ctx.fillStyle = '#ffd700';
+    ctx.restore();
+    
+    // Inner center cap and tracking eyes (drawn without gear rotation so they remain upright!)
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+    ctx.fillStyle = this.color;
     ctx.beginPath();
     ctx.arc(0, 0, 8, 0, Math.PI * 2);
     ctx.fill();
     
+    ctx.fillStyle = '#000000';
+    const eyeOffset = this.eyeOffset || { x: 0, y: 0 };
+    ctx.beginPath();
+    ctx.arc(-2.5 + eyeOffset.x, eyeOffset.y, 1.5, 0, Math.PI * 2);
+    ctx.arc(2.5 + eyeOffset.x, eyeOffset.y, 1.5, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
+    
     ctx.restore();
   }
 }

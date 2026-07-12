@@ -41,20 +41,15 @@ export class AlchemicalCauldron extends Boss {
     ];
     
     this.phase2Sequence = [
-      'CHEMICAL_VAPOR', 'RECOVERY',
-      'ACID_SPLASH', 'RECOVERY',
-      'COLOR_SYNTHESIS', 'RECOVERY',
-      'COMBINED_VAPOR_ACID', 'RECOVERY'
-    ];
-    
-    this.finalSequence = [
       'WOW_CORE_MELTDOWN', 'RECOVERY',
       'COMBINED_VAPOR_ACID', 'RECOVERY',
       'COLOR_SYNTHESIS', 'RECOVERY'
     ];
     
-    this.maxHp = 1100;
-    this.hp = 1100;
+    this.finalSequence = [];
+    
+    this.maxHp = 220;
+    this.hp = 220;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -81,56 +76,17 @@ export class AlchemicalCauldron extends Boss {
     this.sequenceIndex = 0;
   }
 
-  // Override takeDamage to implement the Mixer Paddle block (anti-spam shield)
   takeDamage(amount) {
-    const playerEl = window.gameAppInstance?.player;
-    if (playerEl) {
-      const dashAngle = playerEl.theta;
-      // Normalise angles to check if player hit the mixer paddle!
-      // Mixer paddle points from center (cx, cy) to paddleAngle.
-      // It has width of 24 degrees (~0.42 rad).
-      const normDash = (dashAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-      const normPaddle = (this.paddleAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-      
-      let diff = Math.abs(normDash - normPaddle);
-      if (diff > Math.PI) diff = Math.PI * 2 - diff;
-      
-      if (diff < 0.28 && this.state !== 'TRANSITION') {
-        // BLOCKED BY MIXER PADDLE!
-        playerEl.takeDamage();
-        screenShake.trigger(10, 0.35);
-        
-        // Spawn sparks
-        const hitX = this.cx + Math.cos(dashAngle) * 55;
-        const hitY = this.cy + Math.sin(dashAngle) * 55;
-        particles.spawnExplosion(hitX, hitY, '#39ff14', 12, 5);
-        
-        const banner = document.getElementById('warning-banner');
-        if (banner) {
-          banner.textContent = "BLOCKED BY MIXER PADDLE";
-          banner.style.color = '#39ff14';
-          banner.style.textShadow = '0 0 10px #39ff14';
-          banner.classList.add('active');
-          setTimeout(() => banner.classList.remove('active'), 800);
-        }
-        return; // blocked!
-      }
-    }
-    
     super.takeDamage(amount);
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp < 65) {
-      this.triggerPhaseTransition(2, "ALCHEMICAL REACTION: PHASE 2");
+    if (this.phase === 1 && this.hp <= 55) { // 25% of 220 maxHp
+      this.triggerPhaseTransition(2, 140); // Phase 2 has 140 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-      this.paddleSpeed = 2.2; // spin faster!
-    } else if (this.phase === 2 && this.hp < 30) {
-      this.triggerPhaseTransition(3, "CRITICAL MELTDOWN: FINAL PHASE");
-      this.activeSequence = this.finalSequence;
-      this.sequenceIndex = 0;
-      this.paddleSpeed = 3.0; // extremely fast mixer paddle
+      this.paddleSpeed = 2.8; // spin paddles much faster!
+      this.fluidColor = '#ff00ff'; // change fluid color to magenta!
     }
   }
 
@@ -484,6 +440,17 @@ export class AlchemicalCauldron extends Boss {
     // --- Draw Main Cauldron Core ---
     ctx.save();
     
+    // Apply phase transition or death spin/scale transformations
+    ctx.translate(this.cx, this.cy);
+    if (this.state === 'DEAD') {
+      ctx.rotate(this.deathRotation);
+      ctx.scale(this.deathScale, this.deathScale);
+    } else if (this.state === 'TRANSITION') {
+      ctx.rotate(this.transitionRotation);
+      ctx.scale(this.transitionScale, this.transitionScale);
+    }
+    ctx.translate(-this.cx, -this.cy);
+    
     const dynamicRadius = this.radius * this.visualScale;
     
     // Hit flash translation shake
@@ -517,7 +484,7 @@ export class AlchemicalCauldron extends Boss {
     ctx.fillStyle = this.fluidColor;
     ctx.globalAlpha = 0.35;
     ctx.beginPath();
-    ctx.arc(this.cx, this.cy, dynamicRadius - 6, 0, Math.PI * 2);
+    ctx.arc(this.cx, this.cy, Math.max(0.1, dynamicRadius - 6), 0, Math.PI * 2);
     ctx.fill();
     
     // Draw bubbles

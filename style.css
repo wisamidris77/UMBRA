@@ -45,10 +45,8 @@ body {
 /* Main Container: Fixed 16:9 Aspect Ratio Game Shell */
 #game-container {
   position: relative;
-  width: 100%;
-  height: 100%;
   max-width: 1200px;
-  max-height: 675px; /* 16:9 aspect ratio */
+  max-height: 675px;
   aspect-ratio: 16 / 9;
   background-color: var(--bg-color);
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.8), 
@@ -60,6 +58,19 @@ body {
   justify-content: center;
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+@media (min-aspect-ratio: 16/9) {
+  #game-container {
+    height: 92vh;
+    width: auto;
+  }
+}
+@media (max-aspect-ratio: 16/9) {
+  #game-container {
+    width: 95vw;
+    height: auto;
+  }
 }
 
 /* Canvas Scales Dynamically */
@@ -119,7 +130,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  width: 450px; /* Bigger width */
+  width: 40%;
+  max-width: 450px;
+  min-width: 150px;
 }
 
 #boss-name {
@@ -668,4 +681,403 @@ body {
   0% { transform: scale(0.96); opacity: 0.75; filter: blur(6px); }
   100% { transform: scale(1.05); opacity: 1.0; filter: blur(10px); }
 }
+
+/* ==========================================================================
+   Volume Settings Panel & Pause Controls Styling
+   ========================================================================== */
+
+.settings-panel {
+  background: rgba(13, 15, 23, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 20px;
+  margin: 15px 0;
+  width: 280px;
+  max-width: 100%;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto; /* Ensure inputs can be clicked inside overlays */
+}
+
+.settings-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--neon-cyan);
+  margin-bottom: 10px;
+  text-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
+  font-weight: 800;
+  text-align: center;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.setting-row:last-child {
+  margin-bottom: 0;
+}
+
+.setting-row label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8c98a9;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  flex: 1;
+  text-align: left;
+  user-select: none;
+}
+
+.setting-row span {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: var(--neon-cyan);
+  min-width: 30px;
+  text-align: right;
+  user-select: none;
+}
+
+/* Custom styled Range slider */
+.setting-row input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+  flex: 1.8;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.setting-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan);
+  transition: transform 0.1s;
+}
+
+.setting-row input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.setting-row input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan);
+  border: none;
+  transition: transform 0.1s;
+  cursor: pointer;
+}
+
+.setting-row input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Pause Actions Layout */
+.pause-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+  pointer-events: auto;
+}
+
+/* Pause HUD Button styling */
+.pause-hud-btn {
+  background: rgba(13, 15, 23, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #8c98a9;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  pointer-events: auto; /* Enable click on HUD */
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  padding: 0;
+  outline: none;
+}
+
+.pause-hud-btn:hover {
+  background: rgba(0, 243, 255, 0.15);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+  transform: scale(1.08);
+}
+
+/* Mobile specific responsive styling to avoid HUD and text collisions */
+@media (max-width: 768px) {
+  #hud {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+  }
+  .heart {
+    font-size: 16px;
+  }
+  .heart-svg {
+    width: 14px;
+    height: 14px;
+  }
+  #boss-name {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+  #boss-hp-bar-outer {
+    height: 10px;
+  }
+  .pause-hud-btn {
+    width: 26px;
+    height: 26px;
+  }
+  .pause-hud-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+  .game-title {
+    font-size: 32px;
+    letter-spacing: 5px;
+  }
+  .text-neon-red, .text-neon-cyan, .text-neon-orange {
+    font-size: 36px !important;
+    letter-spacing: 6px !important;
+  }
+  .game-subtitle {
+    font-size: 11px;
+  }
+  .control-help {
+    font-size: 10px;
+    padding: 10px;
+  }
+  .welcome-action {
+    font-size: 11px;
+  }
+  .btn-glow {
+    padding: 8px 20px;
+    font-size: 11px;
+  }
+  .settings-panel {
+    width: 240px;
+    padding: 8px 12px;
+  }
+}
+
+/* Loot/Upgrade Cards Grid */
+.loot-choices-grid {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+  width: 100%;
+  pointer-events: auto;
+}
+
+.loot-card {
+  flex: 1;
+  max-width: 180px;
+  background: rgba(13, 15, 23, 0.85);
+  border: 1px solid rgba(0, 243, 255, 0.15);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.loot-card:hover {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+  transform: translateY(-6px);
+}
+
+.loot-card.selected {
+  border-color: var(--neon-magenta);
+  background: rgba(255, 0, 255, 0.05);
+  box-shadow: 0 0 25px rgba(255, 0, 255, 0.5);
+  transform: scale(1.05);
+}
+
+.loot-card-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.loot-card h3 {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #fff;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.loot-card .description {
+  font-size: 10px;
+  color: #8c98a9;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.loot-card .stat-diff {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--neon-cyan);
+}
+
+.loot-card.selected .stat-diff {
+  color: var(--neon-magenta);
+}
+
+.loot-actions {
+  pointer-events: auto;
+}
+
+/* --- Clean Menu Column Grid Layout --- */
+.menu-grid {
+  display: flex;
+  gap: 40px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.menu-col-left {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.menu-col-right {
+  flex: 0.9;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 100%;
+  max-width: 320px;
+  align-items: stretch;
+}
+
+/* --- Inventory RPG Grid Slots --- */
+.inventory-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 48px;
+}
+
+.inventory-slot {
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(0, 243, 255, 0.15);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: help;
+}
+
+.inventory-slot:hover {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 243, 255, 0.08);
+  transform: scale(1.08);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.25);
+}
+
+.inventory-slot-icon {
+  font-size: 18px;
+}
+
+.inventory-slot-badge {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  background: var(--neon-magenta);
+  color: #fff;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.inventory-slot-tooltip {
+  visibility: hidden;
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(7, 8, 11, 0.95);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 10px;
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.inventory-slot:hover .inventory-slot-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+/* Media Query for Portrait/Mobile */
+@media (max-width: 768px) {
+  .menu-grid {
+    flex-direction: column;
+    gap: 20px;
+  }
+  .menu-col-right {
+    max-width: 100%;
+  }
+}
+
 

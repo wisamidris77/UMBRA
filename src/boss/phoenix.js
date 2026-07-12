@@ -54,8 +54,8 @@ export class SolarPhoenix extends Boss {
       'SOLAR_PROMINENCES', 'RECOVERY'
     ];
     
-    this.maxHp = 600;
-    this.hp = 600;
+    this.maxHp = 160;
+    this.hp = 160;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -145,17 +145,21 @@ export class SolarPhoenix extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp < 65) {
-      this.triggerPhaseTransition(2, "FLARE FLARE: PHASE 2 RUNNING");
+    if (this.phase === 1 && this.hp <= 40) { // 25% of 160 maxHp
+      this.triggerPhaseTransition(2, 100); // Phase 2 has 100 HP (climax!)
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-      this.shieldSpeed = 1.8; // rotate faster!
-    } else if (this.phase === 2 && this.hp < 30) {
-      this.triggerPhaseTransition(3, "CRITICAL HEAT: FINAL PHASE");
-      this.activeSequence = this.finalSequence;
-      this.sequenceIndex = 0;
-      this.shieldSpeed = 2.4; // extremely fast shields
+      this.shieldSpeed = 2.0; // rotate faster!
+      this.color = '#00f3ff'; // Color turns to solar supernova cyan!
     }
+  }
+
+  activeAttackCleanup() {
+    this.prominences = [];
+    this.ashFlares = [];
+    this.stellarWindActive = false;
+    const banner = document.getElementById('warning-banner');
+    if (banner) banner.classList.remove('active');
   }
 
   update(dt, player) {
@@ -163,6 +167,10 @@ export class SolarPhoenix extends Boss {
     if (!window.gameAppInstance) {
       window.gameAppInstance = { player: player };
     }
+    
+    // Tilt body to face player
+    const targetTilt = Math.atan2(player.y - this.cy, player.x - this.cx) - Math.PI / 2;
+    this.bodyTilt = lerp(this.bodyTilt || 0, targetTilt, 4 * dt);
     
     super.update(dt, player);
     
@@ -585,6 +593,22 @@ export class SolarPhoenix extends Boss {
     // --- Draw Main Phoenix Body Core ---
     ctx.save();
     
+    // Apply phase transition or death spin/scale transformations
+    ctx.translate(this.cx, this.cy);
+    if (this.state === 'DEAD') {
+      ctx.rotate(this.deathRotation);
+      ctx.scale(this.deathScale, this.deathScale);
+    } else if (this.state === 'TRANSITION') {
+      ctx.rotate(this.transitionRotation);
+      ctx.scale(this.transitionScale, this.transitionScale);
+    }
+    ctx.translate(-this.cx, -this.cy);
+    
+    // Tilt to face player dynamically
+    ctx.translate(this.cx, this.cy);
+    ctx.rotate(this.bodyTilt || 0);
+    ctx.translate(-this.cx, -this.cy);
+    
     // Hit flash translation shake
     if (this.hitFlashTimer > 0) {
       ctx.translate((Math.random() * 2 - 1) * 3, (Math.random() * 2 - 1) * 3);
@@ -601,19 +625,40 @@ export class SolarPhoenix extends Boss {
     }
     
     // Draw glowing star center core
-    ctx.fillStyle = '#1e0500';
-    ctx.strokeStyle = '#ff3300';
+    ctx.fillStyle = this.phase === 2 ? '#001a1e' : '#1e0500';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 4;
     ctx.shadowBlur = dynamicRadius * 0.7;
-    ctx.shadowColor = '#ff3300';
+    ctx.shadowColor = this.color;
     
     ctx.beginPath();
     ctx.arc(this.cx, this.cy, dynamicRadius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     
+    // Draw Supernova Solar Corona Flare ring in Phase 2
+    if (this.phase === 2) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.45)';
+      ctx.lineWidth = 2.5;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = '#00f3ff';
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const angle = (Math.PI * 2 / 16) * i + Date.now() * 0.003;
+        const r = dynamicRadius + 18 + Math.sin(Date.now() / 80 + i) * 6;
+        const px = this.cx + Math.cos(angle) * r;
+        const py = this.cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+    
     // Draw Phoenix Wing Geometry (bobbing wings)
-    ctx.strokeStyle = '#ff5500';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 3.5;
     ctx.save();
     ctx.translate(this.cx, this.cy);

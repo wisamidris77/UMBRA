@@ -52,8 +52,8 @@ export class ShadowWeaver extends Boss {
       'DECOY_SPLIT', 'RECOVERY'
     ];
     
-    this.maxHp = 750;
-    this.hp = 750;
+    this.maxHp = 180;
+    this.hp = 180;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -154,21 +154,38 @@ export class ShadowWeaver extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp < 65) {
-      this.triggerPhaseTransition(2, "SHADOW WEB OVERLOAD: PHASE 2");
+    if (this.phase === 1 && this.hp <= 45) { // 25% of 180 maxHp
+      this.triggerPhaseTransition(2, 110); // Phase 2 has 110 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-      this.cageSpeed = 1.2;
-    } else if (this.phase === 2 && this.hp < 30) {
-      this.triggerPhaseTransition(3, "VOID ECLIPSE TRIGGERED: FINAL PHASE");
-      this.activeSequence = this.finalSequence;
-      this.sequenceIndex = 0;
-      this.cageSpeed = 1.6;
+      this.cageSpeed = 1.3;
+      this.color = '#da12da'; // Color shifts to void magenta/violet!
     }
+  }
+
+  activeAttackCleanup() {
+    this.decoys = [];
+    this.voidWebs = [];
+    this.cageActive = false;
+    this.spotlightActive = false;
+    const banner = document.getElementById('warning-banner');
+    if (banner) banner.classList.remove('active');
   }
 
   update(dt, player) {
     super.update(dt, player);
+    
+    // Spider eyes tracking player
+    const dx = player.x - this.cx;
+    const dy = player.y - this.cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) {
+      this.eyeX = (dx / dist) * 5;
+      this.eyeY = (dy / dist) * 5;
+    } else {
+      this.eyeX = 0;
+      this.eyeY = 0;
+    }
     
     // Cage rotation
     this.cageRotation += this.cageSpeed * dt;
@@ -538,6 +555,18 @@ export class ShadowWeaver extends Boss {
     
     // --- Draw Main Shadow Spider Core ---
     ctx.save();
+    
+    // Apply phase transition or death spin/scale transformations
+    ctx.translate(this.cx, this.cy);
+    if (this.state === 'DEAD') {
+      ctx.rotate(this.deathRotation);
+      ctx.scale(this.deathScale, this.deathScale);
+    } else if (this.state === 'TRANSITION') {
+      ctx.rotate(this.transitionRotation);
+      ctx.scale(this.transitionScale, this.transitionScale);
+    }
+    ctx.translate(-this.cx, -this.cy);
+    
     const dynamicRadius = this.radius * this.visualScale;
     
     // Hit flash translation shake
@@ -555,12 +584,38 @@ export class ShadowWeaver extends Boss {
       return;
     }
     
+    // Draw Void Octagram Web lattice in Phase 2
+    if (this.phase === 2) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(218, 18, 218, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#da12da';
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const angle1 = (Math.PI * 2 / 8) * i + Date.now() * 0.001;
+        const px1 = this.cx + Math.cos(angle1) * (dynamicRadius + 18);
+        const py1 = this.cy + Math.sin(angle1) * (dynamicRadius + 18);
+        
+        ctx.moveTo(this.cx, this.cy);
+        ctx.lineTo(px1, py1);
+        
+        const angle2 = (Math.PI * 2 / 8) * ((i + 1) % 8) + Date.now() * 0.001;
+        const px2 = this.cx + Math.cos(angle2) * (dynamicRadius + 18);
+        const py2 = this.cy + Math.sin(angle2) * (dynamicRadius + 18);
+        ctx.moveTo(px1, py1);
+        ctx.lineTo(px2, py2);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw geometric spider shape
-    ctx.fillStyle = '#0a0010';
-    ctx.strokeStyle = '#9d00ff';
+    ctx.fillStyle = this.phase === 2 ? '#0b001a' : '#0a0010';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 4;
     ctx.shadowBlur = dynamicRadius * 0.55;
-    ctx.shadowColor = '#9d00ff';
+    ctx.shadowColor = this.color;
     
     ctx.beginPath();
     ctx.arc(this.cx, this.cy, dynamicRadius, 0, Math.PI * 2);
@@ -568,7 +623,7 @@ export class ShadowWeaver extends Boss {
     ctx.stroke();
     
     // Spider legs (floating triangles)
-    ctx.strokeStyle = '#9d00ff';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 2.5;
     const time = Date.now() * 0.004;
     for (let i = 0; i < 6; i++) {
@@ -579,11 +634,15 @@ export class ShadowWeaver extends Boss {
       ctx.stroke();
     }
     
-    // Red spider eyes
+    // Red spider eyes (tracking player)
     ctx.fillStyle = '#ff0055';
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#ff0055';
+    const ex = this.eyeX || 0;
+    const ey = this.eyeY || 0;
     ctx.beginPath();
-    ctx.arc(this.cx - 8, this.cy - 4, 3, 0, Math.PI * 2);
-    ctx.arc(this.cx + 8, this.cy - 4, 3, 0, Math.PI * 2);
+    ctx.arc(this.cx - 8 + ex, this.cy - 4 + ey, 3, 0, Math.PI * 2);
+    ctx.arc(this.cx + 8 + ex, this.cy - 4 + ey, 3, 0, Math.PI * 2);
     ctx.fill();
     
     ctx.restore();

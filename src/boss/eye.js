@@ -38,8 +38,8 @@ export class MechanicalEye extends Boss {
     this.phase2Sequence = ['TRIPLE_SHOT', 'RECOVERY', 'LASER_SWEEP', 'RECOVERY'];
     this.finalSequence = ['TRIPLE_SHOT', 'RECOVERY', 'LASER_SWEEP', 'RECOVERY', 'ORBIT_MINES', 'RECOVERY'];
     
-    this.maxHp = 150;
-    this.hp = 150;
+    this.maxHp = 100;
+    this.hp = 100;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -76,17 +76,23 @@ export class MechanicalEye extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp < 70) {
-      this.triggerPhaseTransition(2, "ARMOR CRACKED: ENTERING PHASE 2");
+    if (this.phase === 1 && this.hp <= 25) { // 25% or lower of 100 maxHp
+      this.triggerPhaseTransition(2, 60); // Phase 2 has 60 HP (quick climax!)
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-      this.armorPlates = 2;
-    } else if (this.phase === 2 && this.hp < 35) {
-      this.triggerPhaseTransition(3, "CRITICAL DETONATION: FINAL PHASE");
-      this.activeSequence = this.finalSequence;
-      this.sequenceIndex = 0;
-      this.armorPlates = 0;
+      this.armorPlates = 0; // Strip all armor plates in phase 2!
     }
+  }
+
+  activeAttackCleanup() {
+    this.laserActive = false;
+    this.laserWarning = false;
+    this.brokenRingActive = false;
+    this.brokenRingWarning = false;
+    this.mines = [];
+    this.targetingLines = [];
+    const banner = document.getElementById('warning-banner');
+    if (banner) banner.classList.remove('active');
   }
 
   update(dt, player) {
@@ -226,7 +232,12 @@ export class MechanicalEye extends Boss {
         this.brokenRingWarning = true; // Show telegraph warning early!
         this.brokenRingActive = false; // Not solid yet
         this.brokenRingRadius = 0; // Starts at center
-        this.brokenRingAngle = Math.random() * Math.PI * 2; // Random rotation start
+        
+        // Target safe zone slightly ahead/behind player
+        const playerAngle1 = window.gameAppInstance ? window.gameAppInstance.player.theta : 0;
+        const dir1 = Math.random() < 0.5 ? 1 : -1;
+        this.brokenRingAngle = playerAngle1 + dir1 * (0.8 + Math.random() * 0.6);
+        
         this.brokenRingSpeed = Math.random() < 0.5 ? 0.4 : -0.4;
         if (banner) {
           banner.textContent = "RING DEPLOYMENT";
@@ -266,7 +277,12 @@ export class MechanicalEye extends Boss {
         this.brokenRingWarning = true; // Show telegraph warning early!
         this.brokenRingActive = false;
         this.brokenRingRadius = 0;
-        this.brokenRingAngle = Math.random() * Math.PI * 2;
+        
+        // Target safe zone slightly ahead/behind player
+        const playerAngle2 = window.gameAppInstance ? window.gameAppInstance.player.theta : 0;
+        const dir2 = Math.random() < 0.5 ? 1 : -1;
+        this.brokenRingAngle = playerAngle2 + dir2 * (0.8 + Math.random() * 0.6);
+        
         this.brokenRingSpeed = 0.5;
         if (banner) {
           banner.textContent = "BARRIER SYSTEM INITIATED";
@@ -635,6 +651,17 @@ export class MechanicalEye extends Boss {
     // --- Draw Main Mechanical Eye ---
     ctx.save();
     
+    // Apply phase transition or death spin/scale transformations
+    ctx.translate(this.cx, this.cy);
+    if (this.state === 'DEAD') {
+      ctx.rotate(this.deathRotation);
+      ctx.scale(this.deathScale, this.deathScale);
+    } else if (this.state === 'TRANSITION') {
+      ctx.rotate(this.transitionRotation);
+      ctx.scale(this.transitionScale, this.transitionScale);
+    }
+    ctx.translate(-this.cx, -this.cy);
+    
     // Pulse sizes with music beat
     const dynamicRadius = this.radius * this.visualScale;
     
@@ -670,9 +697,37 @@ export class MechanicalEye extends Boss {
       return;
     }
     
+    // Draw jagged corona spikes in Phase 2 (Unique form morph!)
+    if (this.phase === 2) {
+      ctx.save();
+      ctx.strokeStyle = '#ff0055';
+      ctx.fillStyle = '#1a0007';
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = '#ff0055';
+      ctx.shadowBlur = 12;
+      
+      const spikesCount = 14;
+      const innerR = dynamicRadius;
+      const outerR = dynamicRadius + 22 + Math.sin(Date.now() / 120) * 4; // pulsating spikes
+      
+      ctx.beginPath();
+      for (let i = 0; i < spikesCount * 2; i++) {
+        const angle = (Math.PI * 2 / (spikesCount * 2)) * i;
+        const r = i % 2 === 0 ? innerR : outerR;
+        const x = this.cx + Math.cos(angle) * r;
+        const y = this.cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw Main Sclera (White eye background)
-    ctx.fillStyle = this.phase === 3 ? '#30020d' : '#0d1017';
-    ctx.strokeStyle = this.phase === 3 ? '#ff0000' : '#ff0055';
+    ctx.fillStyle = this.phase === 2 ? '#30020d' : '#0d1017';
+    ctx.strokeStyle = this.phase === 2 ? '#ff0000' : '#ff0055';
     ctx.lineWidth = 4;
     ctx.shadowBlur = dynamicRadius * 0.5;
     ctx.shadowColor = this.color;
@@ -685,7 +740,7 @@ export class MechanicalEye extends Boss {
     // Draw Iris (Glowing red ring)
     ctx.save();
     ctx.translate(this.cx + this.pupilX, this.cy + this.pupilY);
-    ctx.fillStyle = this.phase === 3 ? '#ff0000' : '#ff3b30';
+    ctx.fillStyle = this.phase === 2 ? '#ff0000' : '#ff3b30';
     ctx.beginPath();
     ctx.arc(0, 0, dynamicRadius * 0.45 * this.pupilScale, 0, Math.PI * 2);
     ctx.fill();

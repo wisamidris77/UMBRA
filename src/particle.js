@@ -17,14 +17,15 @@ class Particle {
     this.alpha = 1;
     this.life = 0;
     this.maxLife = 0;
-    this.type = 'circle'; // 'circle', 'square', 'fragment'
+    this.type = 'circle'; // 'circle', 'square', 'fragment', 'text'
     this.angle = 0;
     this.rotSpeed = 0;
     this.gravity = 0;
     this.drag = 0.98;
+    this.text = '';
   }
 
-  init(x, y, vx, vy, size, color, maxLife, type = 'circle', gravity = 0) {
+  init(x, y, vx, vy, size, color, maxLife, type = 'circle', gravity = 0, text = '') {
     this.x = x;
     this.y = y;
     this.vx = vx;
@@ -35,9 +36,10 @@ class Particle {
     this.life = maxLife;
     this.maxLife = maxLife;
     this.type = type;
-    this.angle = Math.random() * Math.PI * 2;
-    this.rotSpeed = randomRange(-0.1, 0.1);
+    this.angle = type === 'text' ? 0 : Math.random() * Math.PI * 2;
+    this.rotSpeed = type === 'text' ? 0 : randomRange(-0.1, 0.1);
     this.gravity = gravity;
+    this.text = text;
     this.active = true;
   }
 
@@ -89,6 +91,15 @@ class Particle {
       ctx.lineTo(-this.size * 0.8, this.size * 0.6);
       ctx.closePath();
       ctx.fill();
+    } else if (this.type === 'text') {
+      ctx.font = `italic bold ${this.size}px 'Outfit', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Outline
+      ctx.strokeStyle = '#020204';
+      ctx.lineWidth = 4;
+      ctx.strokeText(this.text, 0, 0);
+      ctx.fillText(this.text, 0, 0);
     }
     
     ctx.restore();
@@ -106,11 +117,11 @@ class ParticleManager {
     }
   }
 
-  spawn(x, y, vx, vy, size, color, maxLife, type = 'circle', gravity = 0) {
+  spawn(x, y, vx, vy, size, color, maxLife, type = 'circle', gravity = 0, text = '') {
     // Find inactive particle
     const p = this.particles.find(p => !p.active);
     if (p) {
-      p.init(x, y, vx, vy, size, color, maxLife, type, gravity);
+      p.init(x, y, vx, vy, size, color, maxLife, type, gravity, text);
     }
   }
 
@@ -137,6 +148,13 @@ class ParticleManager {
       // Spawn triangle shards that fall down under gravity
       this.spawn(x, y, vx, vy, size, color, life, 'fragment', 0.15);
     }
+  }
+
+  spawnText(x, y, text, color = '#fff', size = 16) {
+    // Float upwards slowly
+    const vx = randomRange(-0.8, 0.8);
+    const vy = randomRange(-2.5, -1.5);
+    this.spawn(x, y, vx, vy, size, color, 1.2, 'text', 0.04, text);
   }
 
   update(dt) {

@@ -50,8 +50,8 @@ export class VoidSingularity extends Boss {
       'WORMHOLES', 'RECOVERY'
     ];
     
-    this.maxHp = 900;
-    this.hp = 900;
+    this.maxHp = 200;
+    this.hp = 200;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -104,19 +104,35 @@ export class VoidSingularity extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp < 65) {
-      this.triggerPhaseTransition(2, "GRAVITATIONAL COLLAPSE: PHASE 2");
+    if (this.phase === 1 && this.hp <= 50) { // 25% of 200 maxHp
+      this.triggerPhaseTransition(2, 120); // Phase 2 has 120 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
-    } else if (this.phase === 2 && this.hp < 30) {
-      this.triggerPhaseTransition(3, "SINGULARITY EXPANSION: FINAL PHASE");
-      this.activeSequence = this.finalSequence;
-      this.sequenceIndex = 0;
+      this.color = '#ff9d00'; // Color turns to active event horizon orange!
     }
+  }
+
+  activeAttackCleanup() {
+    this.gravityActive = false;
+    this.wormholes = [];
+    const banner = document.getElementById('warning-banner');
+    if (banner) banner.classList.remove('active');
   }
 
   update(dt, player) {
     super.update(dt, player);
+    
+    // Accretion disk warps towards player
+    const dx = player.x - this.cx;
+    const dy = player.y - this.cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) {
+      this.warpX = (dx / dist) * 10;
+      this.warpY = (dy / dist) * 10;
+    } else {
+      this.warpX = 0;
+      this.warpY = 0;
+    }
     
     // Spin swirling accretion disk
     this.diskRotation -= 1.8 * dt;
@@ -520,6 +536,21 @@ export class VoidSingularity extends Boss {
     
     // --- Draw Main Singularity black hole center ---
     ctx.save();
+    
+    // Apply phase transition or death spin/scale transformations
+    ctx.translate(this.cx, this.cy);
+    if (this.state === 'DEAD') {
+      ctx.rotate(this.deathRotation);
+      ctx.scale(this.deathScale, this.deathScale);
+    } else if (this.state === 'TRANSITION') {
+      ctx.rotate(this.transitionRotation);
+      ctx.scale(this.transitionScale, this.transitionScale);
+    }
+    ctx.translate(-this.cx, -this.cy);
+    
+    // Accretion disk warps dynamically towards player
+    ctx.translate(this.warpX || 0, this.warpY || 0);
+    
     const dynamicRadius = this.radius * this.visualScale;
     
     // Hit flash translation shake
@@ -538,11 +569,12 @@ export class VoidSingularity extends Boss {
     }
     
     // Swirling black hole center
+    // Swirling black hole center
     ctx.fillStyle = '#000000';
-    ctx.strokeStyle = '#00f3ff';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 4;
     ctx.shadowBlur = dynamicRadius * 0.75;
-    ctx.shadowColor = '#00f3ff';
+    ctx.shadowColor = this.color;
     
     ctx.beginPath();
     ctx.arc(this.cx, this.cy, dynamicRadius * 0.8, 0, Math.PI * 2);
@@ -550,11 +582,24 @@ export class VoidSingularity extends Boss {
     ctx.stroke();
     
     // Draw event horizon border details
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.6)';
+    ctx.strokeStyle = this.phase === 2 ? 'rgba(255, 157, 0, 0.6)' : 'rgba(0, 243, 255, 0.6)';
     ctx.lineWidth = 2.0;
     ctx.beginPath();
     ctx.arc(this.cx, this.cy, dynamicRadius * 0.95, 0, Math.PI * 2);
     ctx.stroke();
+    
+    // Draw Warped Event Horizon accretion disk in Phase 2 (Glow warp!)
+    if (this.phase === 2) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 157, 0, 0.4)';
+      ctx.lineWidth = 3.5;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ff9d00';
+      ctx.beginPath();
+      ctx.ellipse(this.cx, this.cy, dynamicRadius * 1.5, dynamicRadius * 0.45, Date.now() * 0.002, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     
     ctx.restore();
   }

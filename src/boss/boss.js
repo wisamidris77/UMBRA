@@ -68,6 +68,13 @@ export class Boss {
     
     this.wowAttackTriggered = false;
     this.telegraphBeepPlayed = false;
+
+    // Animation properties
+    this.deathRotation = 0;
+    this.deathScale = 1.0;
+    this.deathAlpha = 1.0;
+    this.transitionRotation = 0;
+    this.transitionScale = 1.0;
   }
 
   reset() {
@@ -82,6 +89,14 @@ export class Boss {
     this.hitFlashTimer = 0;
     this.wowAttackTriggered = false;
     this.telegraphBeepPlayed = false;
+
+    // Reset animations
+    this.deathRotation = 0;
+    this.deathScale = 1.0;
+    this.deathAlpha = 1.0;
+    this.transitionRotation = 0;
+    this.transitionScale = 1.0;
+    
     this.updateHpUI();
   }
 
@@ -108,23 +123,47 @@ export class Boss {
   updateHpUI() {
     const hpBar = document.getElementById('boss-hp-bar-inner');
     const bossNameEl = document.getElementById('boss-name');
+    const container = document.getElementById('boss-hp-container');
     
     if (hpBar) {
       const hpPercent = (this.hp / this.maxHp) * 100;
       hpBar.style.width = `${hpPercent}%`;
       
-      // Dynamic boss HP bar styling based on remaining health
-      if (hpPercent < 30) {
-        hpBar.style.background = 'linear-gradient(90deg, #ff0055, #ff00ff)';
-        hpBar.style.boxShadow = '0 0 15px #ff0055';
+      // Dynamic boss HP bar styling based on phase and remaining health
+      if (this.phase === 2) {
+        hpBar.style.background = 'linear-gradient(90deg, #ff00ff, #00f3ff)';
+        hpBar.style.boxShadow = '0 0 15px #ff00ff';
       } else {
-        hpBar.style.background = 'linear-gradient(90deg, #ff3b30, #ff9d00)';
-        hpBar.style.boxShadow = '0 0 10px #ff3b30';
+        if (hpPercent < 30) {
+          hpBar.style.background = 'linear-gradient(90deg, #ff0055, #ff00ff)';
+          hpBar.style.boxShadow = '0 0 15px #ff0055';
+        } else {
+          hpBar.style.background = 'linear-gradient(90deg, #ff3b30, #ff9d00)';
+          hpBar.style.boxShadow = '0 0 10px #ff3b30';
+        }
+      }
+    }
+    
+    if (container) {
+      if (this.phase === 2) {
+        container.style.width = '60%';
+        container.style.maxWidth = '600px';
+      } else {
+        container.style.width = '40%';
+        container.style.maxWidth = '450px';
       }
     }
     
     if (bossNameEl) {
-      bossNameEl.textContent = `${this.name} - PHASE ${this.phase}`;
+      // Don't say "PHASE 2" in text, just show name, styled differently
+      bossNameEl.textContent = this.name;
+      if (this.phase === 2) {
+        bossNameEl.style.color = '#ff00ff';
+        bossNameEl.style.textShadow = '0 0 10px #ff00ff';
+      } else {
+        bossNameEl.style.color = '#ff3b30';
+        bossNameEl.style.textShadow = 'var(--glow-red)';
+      }
     }
   }
 
@@ -132,37 +171,36 @@ export class Boss {
     // Abstracted: children implement exact breakpoints
   }
 
-  triggerPhaseTransition(nextPhase, warningMessage) {
-    this.state = 'TRANSITION';
-    this.phase = nextPhase;
-    this.stateTimer = 3.0; // 3 seconds safety window
-    this.isVulnerable = false;
-    this.bullets = []; // Clear current bullets
-    
-    // Trigger transition effects
-    screenShake.trigger(20, 1.2);
-    audio.playBossExplode();
-    particles.spawnExplosion(this.cx, this.cy, '#ffffff', 40, 10);
-    particles.spawnShards(this.cx, this.cy, this.color, 25, 7);
+  activeAttackCleanup() {
+    // Subclasses override to clean up active attack elements/hazards
+  }
 
-    // Announce Phase Transition UI
-    const banner = document.getElementById('warning-banner');
-    if (banner) {
-      banner.textContent = warningMessage || `PHASE ${nextPhase} DETECTED`;
-      banner.style.color = '#ff00ff';
-      banner.style.textShadow = '0 0 10px #ff00ff';
-      banner.classList.add('active');
-      setTimeout(() => banner.classList.remove('active'), 2500);
-    }
+  triggerPhaseTransition(nextPhase, newMaxHp) {
+    this.phase = nextPhase;
     
-    // Speed up tempo in Audio Engine
-    if (this.phase === 2) {
+    // Surprise Phase 2: instant transition!
+    if (nextPhase === 2) {
+      // Use new custom max HP if provided, otherwise default to current maxHp
+      this.maxHp = newMaxHp || this.maxHp;
+      this.hp = this.maxHp;
+      
+      // Speed up tempo in Audio Engine
       audio.setBPM(120);
-    } else if (this.phase === 3) {
-      audio.setBPM(135);
+      
+      // Interrupt current attack and clean up active hazards!
+      this.state = 'RECOVERY';
+      this.stateTimer = 1.0; // 1 second transition buffer
+      this.bullets = [];
+      this.activeAttackCleanup();
+      
+      // Visual transition effects (instant flash & shards, but NO state timer freeze)
+      screenShake.trigger(25, 0.8);
+      audio.playBossExplode();
+      particles.spawnExplosion(this.cx, this.cy, '#ffffff', 40, 10);
+      particles.spawnShards(this.cx, this.cy, this.color, 25, 7);
+      
+      this.updateHpUI();
     }
-    
-    this.updateHpUI();
   }
 
   die() {
@@ -191,6 +229,57 @@ export class Boss {
     // Beat pulse visual scaling dampener
     this.visualScale = lerp(this.visualScale, 1.0, 5 * dt);
 
+    if (this.state === 'TRANSITION') {
+      this.transitionRotation += 8 * dt;
+      // oscillate size during transition
+      this.transitionScale = 1.0 + Math.sin((3.0 - this.stateTimer) * Math.PI) * 0.4;
+      this.visualScale = this.transitionScale;
+
+      // Spawn extra transition particles
+      if (Math.random() < 0.2) {
+        const angle = Math.random() * Math.PI * 2;
+        particles.spawn(this.cx, this.cy, Math.cos(angle)*5, Math.sin(angle)*5, 4, this.color, 0.8, 'fragment');
+      }
+      
+      // Update active bullets (no player collision during phase shift)
+      for (let i = this.bullets.length - 1; i >= 0; i--) {
+        const b = this.bullets[i];
+        b.update(dt);
+        if (!b.active) {
+          this.bullets.splice(i, 1);
+        }
+      }
+      return;
+    }
+
+    if (this.state === 'DEAD') {
+      this.deathRotation += 12 * dt;
+      // Shrink over 3 seconds
+      this.deathScale = Math.max(0, this.stateTimer / 3.0);
+      this.deathAlpha = this.deathScale;
+      this.visualScale = this.deathScale;
+
+      // Spawn tiny random explosions on the boss body
+      if (Math.random() < 0.25) {
+        const ox = (Math.random() * 2 - 1) * this.radius * this.deathScale;
+        const oy = (Math.random() * 2 - 1) * this.radius * this.deathScale;
+        particles.spawnExplosion(this.cx + ox, this.cy + oy, this.color, 6, 2.5);
+        if (Math.random() < 0.3) {
+          audio.playHit();
+        }
+      }
+      
+      // Update active bullets
+      for (let i = this.bullets.length - 1; i >= 0; i--) {
+        const b = this.bullets[i];
+        b.update(dt);
+        if (!b.active) {
+          this.bullets.splice(i, 1);
+        }
+      }
+      return;
+    }
+
     // Play warning sound when getting ready / telegraphing
     if (this.state === 'TELEGRAPH') {
       if (!this.telegraphBeepPlayed) {
@@ -200,7 +289,7 @@ export class Boss {
     } else {
       this.telegraphBeepPlayed = false;
     }
-
+    
     // Update active bullets
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];

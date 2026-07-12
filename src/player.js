@@ -47,6 +47,73 @@ export class Player {
     // Trails for motion blur
     this.trail = [];
     this.maxTrailLength = 12;
+
+    // Upgrades
+    this.bonusDamage = 0;
+    this.bonusInvincibility = 0;
+  }
+
+  applyUpgrades(upgrades) {
+    // Reset to base stats first
+    this.maxHp = 5;
+    this.orbitSpeed = (Math.PI * 2) / 6.5;
+    this.maxChargeTime = 2.0;
+    this.dashDuration = 0.15;
+    this.bonusDamage = 0;
+    this.bonusInvincibility = 0;
+
+    if (!upgrades) {
+      this.hp = this.maxHp;
+      this.updateHeartsUI();
+      return;
+    }
+
+    // Apply primary and synergistic secondary stats from the upgraded items
+    
+    // Hyper Drive (orbitSpeed): +25% Orbit Speed & +2 Dash Damage
+    if (upgrades.orbitSpeed) {
+      const stacks = upgrades.orbitSpeed;
+      this.orbitSpeed *= (1 + 0.25 * stacks);
+      this.bonusDamage += 2 * stacks;
+    }
+    
+    // Quantum Capacitor (chargeSpeed): +30% Charge Speed & +20% Dash Speed
+    if (upgrades.chargeSpeed) {
+      const stacks = upgrades.chargeSpeed;
+      this.maxChargeTime /= (1 + 0.30 * stacks);
+      this.dashDuration /= (1 + 0.20 * stacks);
+    }
+    
+    // Chrono Thrusters (dashSpeed): +40% Dash Speed & +1 Max HP
+    if (upgrades.dashSpeed) {
+      const stacks = upgrades.dashSpeed;
+      this.dashDuration /= (1 + 0.40 * stacks);
+      this.maxHp += 1 * stacks;
+    }
+    
+    // Reinforced Hull (maxHp): +1 Max HP & +25% Charge Rate (Less charging time!)
+    if (upgrades.maxHp) {
+      const stacks = upgrades.maxHp;
+      this.maxHp += 1 * stacks;
+      this.maxChargeTime /= (1 + 0.25 * stacks);
+    }
+    
+    // Vortex Matrix (bonusDamage): +5 Dash Damage & +0.4s Invincibility
+    if (upgrades.bonusDamage) {
+      const stacks = upgrades.bonusDamage;
+      this.bonusDamage += 5 * stacks;
+      this.bonusInvincibility += 0.4 * stacks;
+    }
+    
+    // Nano Shielding (bonusInvincibility): +0.6s Invincibility & +15% Orbit Speed
+    if (upgrades.bonusInvincibility) {
+      const stacks = upgrades.bonusInvincibility;
+      this.bonusInvincibility += 0.6 * stacks;
+      this.orbitSpeed *= (1 + 0.15 * stacks);
+    }
+
+    this.hp = this.maxHp;
+    this.updateHeartsUI();
   }
 
   reset() {
@@ -98,10 +165,11 @@ export class Player {
   }
 
   takeDamage() {
+    if (window.gameAppInstance && window.gameAppInstance.superDebugActive) return; // CHEAT CODE IMMORTALITY
     if (this.invincibilityTime > 0 || this.state === 'DEAD') return;
     
     this.hp = Math.max(0, this.hp - 1);
-    this.invincibilityTime = 1.0; // 1 second i-frames
+    this.invincibilityTime = 1.0 + (this.bonusInvincibility || 0); // i-frames including upgrades
     this.flashTimer = 0.1; // Flash red
     
     audio.playHurt();
@@ -129,18 +197,26 @@ export class Player {
   }
 
   updateHeartsUI() {
-    const hearts = document.querySelectorAll('#player-hearts .heart');
-    hearts.forEach((heart, idx) => {
-      if (idx < this.hp) {
-        heart.classList.remove('inactive');
+    const heartsContainer = document.getElementById('player-hearts');
+    if (!heartsContainer) return;
+    
+    heartsContainer.innerHTML = '';
+    for (let i = 0; i < this.maxHp; i++) {
+      const heartSpan = document.createElement('span');
+      heartSpan.className = 'heart';
+      if (i < this.hp) {
+        heartSpan.classList.add('active');
       } else {
-        if (!heart.classList.contains('inactive')) {
-          heart.classList.add('inactive');
-          heart.classList.add('hurt-anim');
-          setTimeout(() => heart.classList.remove('hurt-anim'), 500);
-        }
+        heartSpan.classList.add('inactive');
       }
-    });
+      
+      heartSpan.innerHTML = `
+        <svg class="heart-svg" viewBox="0 0 24 24">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      `;
+      heartsContainer.appendChild(heartSpan);
+    }
   }
 
   update(dt, boss) {
@@ -171,12 +247,19 @@ export class Player {
     switch (this.state) {
       case 'ORBITING':
         // Orbit rotation: angle increases/decreases based on direction
-        this.theta += this.orbitDir * this.orbitSpeed * dt;
+        const currentSpeed = (window.gameAppInstance && window.gameAppInstance.superDebugActive) 
+          ? this.orbitSpeed * 4 
+          : this.orbitSpeed;
+        this.theta += this.orbitDir * currentSpeed * dt;
         this.updatePosition();
         break;
         
       case 'CHARGING':
-        this.chargeTime += dt;
+        if (window.gameAppInstance && window.gameAppInstance.superDebugActive) {
+          this.chargeTime = this.maxChargeTime;
+        } else {
+          this.chargeTime += dt;
+        }
         this.chargePercent = clamp(this.chargeTime / this.maxChargeTime, 0, 1);
         audio.updateChargePitch(this.chargePercent);
         
@@ -194,7 +277,10 @@ export class Player {
         
       case 'DASHING':
         // Smoothly interpolate towards the boss center (0, 0 local center, which is cx, cy)
-        this.dashProgress += dt / this.dashDuration;
+        const currentDashDuration = (window.gameAppInstance && window.gameAppInstance.superDebugActive)
+          ? this.dashDuration * 0.2
+          : this.dashDuration;
+        this.dashProgress += dt / currentDashDuration;
         
         if (this.dashProgress >= 1) {
           this.dashProgress = 1;
@@ -213,14 +299,20 @@ export class Player {
         
       case 'RETURNING':
         // Smoothly slide back out to the orbit point
-        this.dashProgress += dt / this.returnDuration;
+        const currentReturnDuration = (window.gameAppInstance && window.gameAppInstance.superDebugActive)
+          ? this.returnDuration * 0.2
+          : this.returnDuration;
+        this.dashProgress += dt / currentReturnDuration;
         
         // Calculate the current target orbit coordinate (which might keep rotating)
         const targetX = this.cx + Math.cos(this.theta) * this.orbitRadius;
         const targetY = this.cy + Math.sin(this.theta) * this.orbitRadius;
         
         // Rotate while returning so movement is seamless
-        this.theta += this.orbitDir * this.orbitSpeed * dt;
+        const returnOrbitSpeed = (window.gameAppInstance && window.gameAppInstance.superDebugActive)
+          ? this.orbitSpeed * 4
+          : this.orbitSpeed;
+        this.theta += this.orbitDir * returnOrbitSpeed * dt;
         
         if (this.dashProgress >= 1) {
           this.state = 'ORBITING';
@@ -236,19 +328,33 @@ export class Player {
   }
 
   handleHit(boss) {
+    if (window.gameAppInstance && window.gameAppInstance.state === 'CHEST_LOOT') {
+      window.gameAppInstance.breakChest();
+      this.state = 'RETURNING';
+      this.dashProgress = 0;
+      return;
+    }
+
     if (!boss || boss.hp <= 0) {
       this.state = 'RETURNING';
       this.dashProgress = 0;
       return;
     }
     
-    // Calculate damage: base is 6, fully charged is 24
-    const dmg = Math.round(lerp(6, 24, this.chargePercent));
+    // Calculate damage: base is 2, fully charged is 35 (quadratic scaling) + bonus upgrade damage
+    const dmg = Math.round(lerp(2, 35, Math.pow(this.chargePercent, 2))) + (this.bonusDamage || 0);
     
     // Hit effects
     boss.takeDamage(dmg);
     hitStop.trigger(0.08); // 80ms freeze
     screenShake.trigger(18, 0.45); // Heavy impact shake
+    
+    // Spawn damage floating text
+    if (this.chargePercent >= 0.95) {
+      particles.spawnText(this.x, this.y - 30, `${dmg} CRITICAL!`, '#00f3ff', 22);
+    } else {
+      particles.spawnText(this.x, this.y - 30, `${dmg}`, '#ffffff', 16);
+    }
     
     // Particle splash
     particles.spawnExplosion(this.cx, this.cy, '#ff0055', 25, 8);
