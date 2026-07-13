@@ -79,6 +79,11 @@ export class Boss {
 
   reset() {
     audio.playLaserStop();
+    if (this.initialMaxHp === undefined) {
+      this.initialMaxHp = this.maxHp;
+    } else {
+      this.maxHp = this.initialMaxHp;
+    }
     this.hp = this.maxHp;
     this.state = 'IDLE';
     this.phase = 1;
@@ -150,16 +155,13 @@ export class Boss {
     }
     
     if (container) {
-      if (this.phase === 3) {
-        container.style.width = '70%';
-        container.style.maxWidth = '750px';
-      } else if (this.phase === 2) {
-        container.style.width = '60%';
-        container.style.maxWidth = '600px';
-      } else {
-        container.style.width = '40%';
-        container.style.maxWidth = '450px';
-      }
+      const minHP = 100;
+      const maxHP = 400;
+      const t = clamp((this.maxHp - minHP) / (maxHP - minHP), 0, 1);
+      const targetWidth = lerp(40, 75, t);
+      const targetMaxWidth = lerp(450, 800, t);
+      container.style.width = `${targetWidth}%`;
+      container.style.maxWidth = `${targetMaxWidth}px`;
     }
     
     if (bossNameEl) {

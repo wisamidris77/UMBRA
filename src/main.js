@@ -74,12 +74,12 @@ class TreasureChest {
 }
 
 const UPGRADES_LIST = [
-  { id: 'orbitSpeed', name: 'Hyper Drive', desc: 'Accelerates orbit and punch force', diff: '+25% Orbit Speed & +2 Dash Damage', icon: '⚡' },
-  { id: 'chargeSpeed', name: 'Quantum Capacitor', desc: 'Overclocks battery charge and engine', diff: '+30% Charge Rate & +20% Dash Speed', icon: '🔋' },
-  { id: 'dashSpeed', name: 'Chrono Thrusters', desc: 'Improves dash timing and shields', diff: '+40% Dash Speed & +1 Max HP', icon: '🚀' },
-  { id: 'maxHp', name: 'Reinforced Hull', desc: 'Extra hearts with capacitors', diff: '+1 Max HP & +25% Charge Rate', icon: '💖' },
-  { id: 'bonusDamage', name: 'Vortex Matrix', desc: 'Amplifies dash power and i-frames', diff: '+5 Dash Damage & +0.4s Invincibility', icon: '💥' },
-  { id: 'bonusInvincibility', name: 'Nano Shielding', desc: 'Extends protection and thrusters', diff: '+0.6s Invincibility & +15% Orbit Speed', icon: '🛡️' }
+  { id: 'orbitSpeed', name: 'Hyper Drive', desc: 'Accelerates orbit and punch force', diff: '+15% Orbit Speed & +1 Dash Damage', icon: '⚡' },
+  { id: 'chargeSpeed', name: 'Quantum Capacitor', desc: 'Overclocks battery charge and engine', diff: '+15% Charge Rate & +10% Dash Speed', icon: '🔋' },
+  { id: 'dashSpeed', name: 'Chrono Thrusters', desc: 'Improves dash timing and engine power', diff: '+20% Dash Speed & +1 Dash Damage', icon: '🚀' },
+  { id: 'maxHp', name: 'Reinforced Hull', desc: 'Extra hearts with capacitors', diff: '+1 Max HP & +10% Charge Rate', icon: '💖' },
+  { id: 'bonusDamage', name: 'Vortex Matrix', desc: 'Amplifies dash power and i-frames', diff: '+3 Dash Damage & +0.2s Invincibility', icon: '💥' },
+  { id: 'bonusInvincibility', name: 'Nano Shielding', desc: 'Extends protection and thrusters', diff: '+0.3s Invincibility & +10% Orbit Speed', icon: '🛡️' }
 ];
 
 class GameApp {
@@ -198,6 +198,9 @@ class GameApp {
     const menuSectorSelect = document.getElementById('menu-sector-select');
     if (menuSectorSelect) {
       menuSectorSelect.value = level.toString();
+      menuSectorSelect.addEventListener('change', (e) => {
+        this.setLevelBoss(parseInt(e.target.value, 10));
+      });
     }
   }
 
@@ -284,9 +287,10 @@ class GameApp {
     
     // --- Input Hooks (Mouse & Keypresses) ---
     
+    window.addEventListener('contextmenu', e => e.preventDefault());
+
     const handlePress = (e) => {
-      if (e.repeat) return;
-      
+      if (e && e.repeat) return;
       this.enableAudioContext();
       
       // Menu overlay transition
@@ -295,10 +299,21 @@ class GameApp {
         return;
       }
 
-      // Loot overlay proceed shortcut
       if (this.state === 'CHEST_LOOT' && this.chest && this.chest.isBroken) {
-        if (this.selectedUpgrade) {
-          this.proceedToNextSector();
+        if (!e || !e.repeat) {
+          // Start hold confirmation on current selection (do not cycle on keydown!)
+          this.isHoldingSpace = true;
+          this.spaceHoldTime = 0;
+        }
+        return;
+      } else if (this.state === 'ENDING_STORY') {
+        if (this.endingStage === 'GEOMETRY_CARDS' && (!e || !e.repeat)) {
+          this.advanceGeometryCard();
+        } else if (this.endingStage === 'DIALOGUE' && this.activeDialogueChoices && this.activeDialogueChoices.length > 0) {
+          if (!e || !e.repeat) {
+            this.isHoldingSpaceEnding = true;
+            this.spaceHoldTimeEnding = 0;
+          }
         }
         return;
       }
@@ -322,56 +337,15 @@ class GameApp {
     };
 
     const handleRelease = (e) => {
-      if (!this.inputPressed) return;
-      if ((this.state !== 'PLAYING' && !(this.state === 'CHEST_LOOT' && this.chest && !this.chest.isBroken)) || this.player.state === 'DEAD') return;
-      
-      this.inputPressed = false;
-      const duration = performance.now() - this.pressStartTime;
-      this.player.release(duration);
-    };
-
-    // Keyboard bindings
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        
-        if (this.state === 'CHEST_LOOT' && this.chest && this.chest.isBroken) {
-          if (!e.repeat) {
-            // Start hold confirmation on current selection (do not cycle on keydown!)
-            this.isHoldingSpace = true;
-            this.spaceHoldTime = 0;
-          }
-        } else if (this.state === 'ENDING_STORY') {
-          if (this.endingStage === 'GEOMETRY_CARDS' && !e.repeat) {
-            this.advanceGeometryCard();
-          } else if (this.endingStage === 'DIALOGUE' && this.activeDialogueChoices && this.activeDialogueChoices.length > 0) {
-            if (!e.repeat) {
-              this.isHoldingSpaceEnding = true;
-              this.spaceHoldTimeEnding = 0;
-            }
-          }
-        } else {
-          handlePress(e);
-        }
-      }
-      if (e.code === 'Escape' || e.code === 'KeyP') {
-        e.preventDefault();
-        this.togglePause();
-      }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        
-        if (this.state === 'CHEST_LOOT' && this.chest && this.chest.isBroken) {
-          // If they release before confirming, cycle selection to the next card!
-          if (this.isHoldingSpace) {
-            this.isHoldingSpace = false;
-            this.spaceHoldTime = 0;
-            const progressInner = document.getElementById('loot-hold-bar-inner');
-            if (progressInner) progressInner.style.width = '0%';
-            
+      if (this.state === 'CHEST_LOOT' && this.chest && this.chest.isBroken) {
+        // If they release before confirming, cycle selection to the next card!
+        if (this.isHoldingSpace) {
+          this.isHoldingSpace = false;
+          this.spaceHoldTime = 0;
+          const progressInner = document.getElementById('loot-hold-bar-inner');
+          if (progressInner) progressInner.style.width = '0%';
+          
+          if (!this.isHoldingSpecificCard) {
             // Cycle card selection index
             this.lootSelectedIndex = (this.lootSelectedIndex + 1) % 3;
             this.selectedUpgrade = this.lootChoices[this.lootSelectedIndex].id;
@@ -382,34 +356,79 @@ class GameApp {
               if (idx === this.lootSelectedIndex) c.classList.add('selected');
               else c.classList.remove('selected');
             });
+          } else {
+            this.isHoldingSpecificCard = false;
           }
-        } else if (this.state === 'ENDING_STORY') {
-          if (this.endingStage === 'DIALOGUE' && this.isHoldingSpaceEnding) {
-            this.isHoldingSpaceEnding = false;
-            if (this.spaceHoldTimeEnding < 1.0) {
-              this.spaceHoldTimeEnding = 0;
-              const barInner = document.getElementById('dialogue-hold-bar-inner');
-              if (barInner) barInner.style.width = '0%';
-              
-              this.dialogueSelectedChoiceIndex = (this.dialogueSelectedChoiceIndex + 1) % this.activeDialogueChoices.length;
-              this.updateDialogueChoiceSelectionVisuals();
-              audio.playNoteHitSFX();
-            }
-          }
-        } else {
-          handleRelease(e);
         }
+        return;
+      } else if (this.state === 'ENDING_STORY') {
+        if (this.endingStage === 'DIALOGUE' && this.isHoldingSpaceEnding) {
+          this.isHoldingSpaceEnding = false;
+          if (this.spaceHoldTimeEnding < 1.0) {
+            this.spaceHoldTimeEnding = 0;
+            const barInner = document.getElementById('dialogue-hold-bar-inner');
+            if (barInner) barInner.style.width = '0%';
+            
+            this.dialogueSelectedChoiceIndex = (this.dialogueSelectedChoiceIndex + 1) % this.activeDialogueChoices.length;
+            this.updateDialogueChoiceSelectionVisuals();
+            audio.playNoteHitSFX();
+          }
+        }
+        return;
+      }
+
+      if (!this.inputPressed) return;
+      if ((this.state !== 'PLAYING' && !(this.state === 'CHEST_LOOT' && this.chest && !this.chest.isBroken)) || this.player.state === 'DEAD') return;
+      
+      this.inputPressed = false;
+      const duration = performance.now() - this.pressStartTime;
+      this.player.release(duration);
+    };
+
+    // Keyboard bindings
+    this.cheatBuffer = '';
+    const targetCheat = 'lkjlkjlkj';
+
+    window.addEventListener('keydown', (e) => {
+      // Cheat code logic
+      if (e.key.length === 1) {
+        this.cheatBuffer += e.key.toLowerCase();
+        if (this.cheatBuffer.length > targetCheat.length) {
+          this.cheatBuffer = this.cheatBuffer.slice(-targetCheat.length);
+        }
+        if (this.cheatBuffer === targetCheat) {
+          this.toggleSuperDebugCheat();
+          this.cheatBuffer = '';
+        }
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handlePress(e);
+      }
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        e.preventDefault();
+        this.togglePause();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleRelease(e);
       }
     });
 
     // Mouse click and touch bounds
     const playArea = document.getElementById('game-container');
     playArea.addEventListener('mousedown', (e) => {
-      // Ignore clicks on menus, debug buttons, sliders, or action panels
-      if (e.button !== 0 || 
+      // Ignore clicks on menus, debug buttons, sliders, action panels, loot cards, or dialogue buttons
+      if ((e.button !== 0 && e.button !== 2) || 
           e.target.closest('.settings-panel') || 
           e.target.closest('.pause-hud-btn') || 
-          e.target.closest('.pause-actions')) return;
+          e.target.closest('.pause-actions') ||
+          e.target.closest('.loot-card') ||
+          e.target.closest('.dialogue-choice-btn')) return;
       handlePress(e);
     });
 
@@ -435,7 +454,9 @@ class GameApp {
     playArea.addEventListener('touchstart', (e) => {
       if (e.target.closest('.settings-panel') || 
           e.target.closest('.pause-hud-btn') || 
-          e.target.closest('.pause-actions')) return;
+          e.target.closest('.pause-actions') ||
+          e.target.closest('.loot-card') ||
+          e.target.closest('.dialogue-choice-btn')) return;
       e.preventDefault();
       handlePress(e);
     }, { passive: false });
@@ -533,6 +554,14 @@ class GameApp {
     // Enable audio context triggers
     window.addEventListener('click', () => this.enableAudioContext(), { once: true });
     window.addEventListener('keydown', () => this.enableAudioContext(), { once: true });
+
+    const secretCheatBtn = document.getElementById('secret-cheat-trigger');
+    if (secretCheatBtn) {
+      secretCheatBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleSuperDebugCheat();
+      });
+    }
   }
 
   resizeCanvas() {
@@ -648,7 +677,22 @@ class GameApp {
   showLootOverlay() {
     this.state = 'CHEST_LOOT'; // Transition state
     
-    const shuffled = [...UPGRADES_LIST].sort(() => 0.5 - Math.random());
+    // Prioritize upgrades the player doesn't already have
+    let availableUpgrades = UPGRADES_LIST.filter(upg => !this.upgrades[upg.id] || this.upgrades[upg.id] === 0);
+    
+    // Fill remaining slots with already owned upgrades if there are fewer than 3 left
+    if (availableUpgrades.length < 3) {
+      const alreadyOwned = UPGRADES_LIST.filter(upg => this.upgrades[upg.id] && this.upgrades[upg.id] > 0);
+      alreadyOwned.sort(() => 0.5 - Math.random());
+      for (const upg of alreadyOwned) {
+        if (availableUpgrades.length >= 3) break;
+        if (!availableUpgrades.includes(upg)) {
+          availableUpgrades.push(upg);
+        }
+      }
+    }
+    
+    const shuffled = [...availableUpgrades].sort(() => 0.5 - Math.random());
     const choices = shuffled.slice(0, 3);
     
     this.lootChoices = choices;
@@ -671,20 +715,53 @@ class GameApp {
         <div class="stat-diff">${upg.diff}</div>
       `;
       
-      card.addEventListener('click', (e) => {
-        e.stopPropagation();
+      const selectLoot = () => {
         this.lootSelectedIndex = idx;
         this.selectedUpgrade = upg.id;
         document.querySelectorAll('.loot-card').forEach((c, cIdx) => {
           if (cIdx === idx) c.classList.add('selected');
           else c.classList.remove('selected');
         });
+      };
+
+      const startCardHold = (e) => {
+        e.stopPropagation();
+        selectLoot();
+        this.isHoldingSpace = true;
+        this.spaceHoldTime = 0;
+        this.isHoldingSpecificCard = true;
+      };
+
+      const releaseCardHold = (e) => {
+        e.stopPropagation();
+        if (this.isHoldingSpace) {
+          this.isHoldingSpace = false;
+          this.spaceHoldTime = 0;
+          const progressInner = document.getElementById('loot-hold-bar-inner');
+          if (progressInner) progressInner.style.width = '0%';
+        }
+      };
+
+      card.addEventListener('mousedown', (e) => {
+        if (e.button === 0 || e.button === 2) {
+          startCardHold(e);
+        }
       });
+
+      card.addEventListener('mouseup', releaseCardHold);
+
+      card.addEventListener('touchstart', (e) => {
+        startCardHold(e);
+      }, { passive: true });
+
+      card.addEventListener('touchend', releaseCardHold);
+      
       container.appendChild(card);
     });
     
     // Reset space hold state
     this.isHoldingSpace = false;
+    this.isHoldingSpecificCard = false;
     this.spaceHoldTime = 0;
     const progressInner = document.getElementById('loot-hold-bar-inner');
     if (progressInner) progressInner.style.width = '0%';
@@ -858,13 +935,13 @@ class GameApp {
     const typeNextChar = () => {
       bubble.textContent += text[charIndex];
       charIndex++;
+      dialogueLog.scrollTop = dialogueLog.scrollHeight;
       if (charIndex < text.length) {
         if (text[charIndex] === ' ') {
           audio.playNoteHitSFX();
         }
         setTimeout(typeNextChar, 55);
       } else {
-        dialogueLog.scrollTop = dialogueLog.scrollHeight;
         if (callback) callback();
       }
     };
@@ -887,12 +964,31 @@ class GameApp {
       btn.className = 'dialogue-choice-btn';
       btn.textContent = c.text;
       
-      btn.addEventListener('click', () => {
+      const selectChoice = () => {
+        if (this.activeDialogueChoices.length === 0) return;
         this.activeDialogueChoices = [];
         dialogueChoices.innerHTML = '';
         if (holdContainer) holdContainer.style.display = 'none';
         c.action();
+      };
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectChoice();
       });
+
+      btn.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        if (e.button === 0 || e.button === 2) {
+          selectChoice();
+        }
+      });
+
+      btn.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        selectChoice();
+      }, { passive: false });
       
       dialogueChoices.appendChild(btn);
     });
@@ -1110,7 +1206,6 @@ class GameApp {
     this.showGeometryCard(0);
 
     const geometryScreen = document.getElementById('story-geometry-screen');
-    geometryScreen.onclick = () => this.advanceGeometryCard();
 
     this.geometryLoopActive = true;
     const canvas = document.getElementById('geometry-canvas');
@@ -1274,13 +1369,32 @@ class GameApp {
   toggleSuperDebugCheat() {
     this.superDebugActive = !this.superDebugActive;
     
+    if (this.superDebugActive) {
+      // Clear upgrades and reset campaign progress to 1
+      this.currentLevel = 1;
+      this.upgrades = {};
+      this.saveJourney();
+      
+      const select = document.getElementById('menu-sector-select');
+      if (select) select.value = '1';
+    }
+    
+    if (this.player) {
+      this.player.applyUpgrades(this.upgrades || {});
+    }
+
+    const cheatPanel = document.getElementById('cheat-sector-panel');
+    if (cheatPanel) {
+      cheatPanel.style.display = this.superDebugActive ? 'block' : 'none';
+    }
+
     audio.playHealSFX();
     particles.spawnExplosion(this.player.x, this.player.y, '#39ff14', 20, 5);
     
     particles.spawnText(
       this.player.x, 
       this.player.y - 30, 
-      this.superDebugActive ? "CHEAT ON: INSTA-CHARGE" : "CHEAT OFF", 
+      this.superDebugActive ? "CHEAT ON: IMMORTAL & FAST" : "CHEAT OFF", 
       this.superDebugActive ? "#39ff14" : "#ff3b30", 
       18
     );

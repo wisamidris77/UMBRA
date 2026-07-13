@@ -88,8 +88,8 @@ export class VoidSingularity extends Boss {
     
     this.finalSequence = [];
     
-    this.maxHp = 200;
-    this.hp = 200;
+    this.maxHp = 350;
+    this.hp = 350;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -148,13 +148,13 @@ export class VoidSingularity extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 66) { // 33% of 200
-      this.triggerPhaseTransition(2, 180); // Phase 2 has 180 HP
+    if (this.phase === 1 && this.hp <= 116) { // 33% of 350
+      this.triggerPhaseTransition(2, 300); // Phase 2 has 300 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
       this.color = '#ff9d00'; // Color turns to active event horizon orange!
-    } else if (this.phase === 2 && this.hp <= 54) { // 30% of 180
-      this.triggerPhaseTransition(3, 240); // Phase 3 has 240 HP
+    } else if (this.phase === 2 && this.hp <= 90) { // 30% of 300
+      this.triggerPhaseTransition(3, 400); // Phase 3 has 400 HP
       this.activeSequence = this.phase3Sequence;
       this.sequenceIndex = 0;
       this.color = '#ff0033'; // Color turns to collapsing void crimson!

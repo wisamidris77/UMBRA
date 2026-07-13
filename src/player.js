@@ -71,46 +71,52 @@ export class Player {
 
     // Apply primary and synergistic secondary stats from the upgraded items
     
-    // Hyper Drive (orbitSpeed): +25% Orbit Speed & +2 Dash Damage
+    // Hyper Drive (orbitSpeed): +15% Orbit Speed & +1 Dash Damage
     if (upgrades.orbitSpeed) {
       const stacks = upgrades.orbitSpeed;
-      this.orbitSpeed *= (1 + 0.25 * stacks);
-      this.bonusDamage += 2 * stacks;
+      this.orbitSpeed *= (1 + 0.15 * stacks);
+      this.bonusDamage += 1 * stacks;
     }
     
-    // Quantum Capacitor (chargeSpeed): +30% Charge Speed & +20% Dash Speed
+    // Quantum Capacitor (chargeSpeed): +15% Charge Speed & +10% Dash Speed
     if (upgrades.chargeSpeed) {
       const stacks = upgrades.chargeSpeed;
-      this.maxChargeTime /= (1 + 0.30 * stacks);
-      this.dashDuration /= (1 + 0.20 * stacks);
+      this.maxChargeTime /= (1 + 0.15 * stacks);
+      this.dashDuration /= (1 + 0.10 * stacks);
     }
     
-    // Chrono Thrusters (dashSpeed): +40% Dash Speed & +1 Max HP
+    // Chrono Thrusters (dashSpeed): +20% Dash Speed & +1 Dash Damage
     if (upgrades.dashSpeed) {
       const stacks = upgrades.dashSpeed;
-      this.dashDuration /= (1 + 0.40 * stacks);
-      this.maxHp += 1 * stacks;
+      this.dashDuration /= (1 + 0.20 * stacks);
+      this.bonusDamage += 1 * stacks;
     }
     
-    // Reinforced Hull (maxHp): +1 Max HP & +25% Charge Rate (Less charging time!)
+    // Reinforced Hull (maxHp): +1 Max HP & +10% Charge Rate
     if (upgrades.maxHp) {
       const stacks = upgrades.maxHp;
       this.maxHp += 1 * stacks;
-      this.maxChargeTime /= (1 + 0.25 * stacks);
+      this.maxChargeTime /= (1 + 0.10 * stacks);
     }
     
-    // Vortex Matrix (bonusDamage): +5 Dash Damage & +0.4s Invincibility
+    // Vortex Matrix (bonusDamage): +3 Dash Damage & +0.2s Invincibility
     if (upgrades.bonusDamage) {
       const stacks = upgrades.bonusDamage;
-      this.bonusDamage += 5 * stacks;
-      this.bonusInvincibility += 0.4 * stacks;
+      this.bonusDamage += 3 * stacks;
+      this.bonusInvincibility += 0.2 * stacks;
     }
     
-    // Nano Shielding (bonusInvincibility): +0.6s Invincibility & +15% Orbit Speed
+    // Nano Shielding (bonusInvincibility): +0.3s Invincibility & +10% Orbit Speed
     if (upgrades.bonusInvincibility) {
       const stacks = upgrades.bonusInvincibility;
-      this.bonusInvincibility += 0.6 * stacks;
-      this.orbitSpeed *= (1 + 0.15 * stacks);
+      this.bonusInvincibility += 0.3 * stacks;
+      this.orbitSpeed *= (1 + 0.10 * stacks);
+    }
+
+    if (window.gameAppInstance && window.gameAppInstance.superDebugActive) {
+      this.maxChargeTime = 0.01;
+      this.dashDuration = 0.01;
+      this.orbitSpeed *= 3;
     }
 
     this.hp = this.maxHp;
@@ -356,7 +362,8 @@ export class Player {
     }
     
     // Calculate damage: base is 2, fully charged is 20 (quadratic scaling) + bonus upgrade damage
-    const dmg = Math.round(lerp(2, 20, Math.pow(this.chargePercent, 2))) + (this.bonusDamage || 0);
+    let dmg = Math.round(lerp(2, 20, Math.pow(this.chargePercent, 2))) + (this.bonusDamage || 0);
+    if (window.gameAppInstance && window.gameAppInstance.superDebugActive) dmg = 99999;
     
     // Hit effects
     boss.takeDamage(dmg);

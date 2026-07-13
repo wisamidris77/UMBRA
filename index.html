@@ -88,6 +88,9 @@
             <div class="welcome-action text-blink" style="margin-top: 25px;">
               CLICK OR PRESS SPACE TO START
             </div>
+            <div id="secret-cheat-trigger" style="margin-top: 30px; font-size: 11px; opacity: 0.25; cursor: pointer; font-family: 'Share Tech Mono'; letter-spacing: 2px; color: var(--neon-cyan); transition: opacity 0.3s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=0.25">
+              lkjlkjlkj
+            </div>
 
           </div>
           
@@ -110,6 +113,21 @@
                 <label for="sfx-volume">SFX Volume</label>
                 <input type="range" id="sfx-volume" min="0" max="1" step="0.05" value="0.7">
                 <span id="sfx-volume-val">70%</span>
+              </div>
+            </div>
+
+            <!-- Sector Selection Panel (Cheat only) -->
+            <div id="cheat-sector-panel" class="settings-panel" style="display: none; border-color: #39ff14;">
+              <div class="settings-title" style="color: #39ff14;">SECTOR JUMP [CHEAT]</div>
+              <div class="setting-row">
+                <label for="menu-sector-select" style="color: #39ff14;">Sector</label>
+                <select id="menu-sector-select" style="background: rgba(0,0,0,0.8); color: #39ff14; border: 1px solid #39ff14; font-family: 'Share Tech Mono'; padding: 2px;">
+                  <option value="1">Sector 1: The Mechanical Eye</option>
+                  <option value="2">Sector 2: Sigma The Serpent</option>
+                  <option value="3">Sector 3: Nebula Wasp</option>
+                  <option value="4">Sector 4: Crystal Titan</option>
+                  <option value="5">Sector 5: Core Entity (True Boss)</option>
+                </select>
               </div>
             </div>
 

@@ -38,8 +38,8 @@ export class MechanicalEye extends Boss {
     this.phase2Sequence = ['LASER_SWEEP', 'RECOVERY', 'ORBIT_MINES', 'RECOVERY', 'TRIPLE_SHOT', 'RECOVERY'];
     this.finalSequence = [];
     
-    this.maxHp = 100;
-    this.hp = 100;
+    this.maxHp = 180;
+    this.hp = 180;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -76,8 +76,8 @@ export class MechanicalEye extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 25) { // 25% or lower of 100 maxHp
-      this.triggerPhaseTransition(2, 60); // Phase 2 has 60 HP (quick climax!)
+    if (this.phase === 1 && this.hp <= 45) { // 25% or lower of 180 maxHp
+      this.triggerPhaseTransition(2, 100); // Phase 2 has 100 HP (quick climax!)
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
       this.armorPlates = 0; // Strip all armor plates in phase 2!

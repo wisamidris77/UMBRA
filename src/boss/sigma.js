@@ -56,8 +56,9 @@ class SigmaWave {
 export class Sigma extends Boss {
   constructor(cx, cy) {
     super(cx, cy, "SIGMA: THE OVERLORD", '#00ff00');
-    this.maxHp = 60;
-    this.hp = 60;
+    this.phaseMaxHps = [120, 180, 200, 220, 250];
+    this.maxHp = this.phaseMaxHps[0];
+    this.hp = this.maxHp;
     this.baseRadius = 40;
     
     // 5 Phases configuration
@@ -144,6 +145,14 @@ export class Sigma extends Boss {
     this.stateTimer = 3.0;
   }
 
+  reset() {
+    super.reset();
+    if (this.phaseMaxHps) {
+      this.maxHp = this.phaseMaxHps[0];
+      this.hp = this.maxHp;
+    }
+  }
+
   takeDamage(amount) {
     const wasHolding = this.isHoldingPlayer;
     super.takeDamage(amount);
@@ -167,9 +176,10 @@ export class Sigma extends Boss {
   }
 
   checkPhaseTransitions() {
-    // Sigma has 5 phases. Each phase is 60 HP.
+    // Sigma has 5 phases with escalating health pools.
     if (this.hp <= 0 && this.phase < 5) {
       this.phase++;
+      this.maxHp = this.phaseMaxHps[this.phase - 1];
       this.hp = this.maxHp;
       this.color = this.phaseColors[this.phase - 1];
       
@@ -447,7 +457,7 @@ export class Sigma extends Boss {
           
           if (distance < this.baseRadius + player.radius + 15) {
             this.chinSlamParried = true;
-            super.takeDamage(15);
+            super.takeDamage(4);
             screenShake.trigger(35, 0.5);
             audio.playBossExplode();
             particles.spawnExplosion(bossActualX, bossActualY, '#ffffff', 40, 10);
@@ -525,7 +535,7 @@ export class Sigma extends Boss {
           const by = this.cy + this.tripleSlamLungeY;
           if (Math.hypot(player.x - bx, player.y - by) < this.baseRadius + player.radius + 15) {
             this.tripleSlamParried = true;
-            super.takeDamage(12);
+            super.takeDamage(3);
             audio.playBossExplode();
             screenShake.trigger(30, 0.4);
             particles.spawnExplosion(bx, by, '#ffffff', 30, 8);
@@ -609,7 +619,7 @@ export class Sigma extends Boss {
           const by = this.cy + this.orbitalSweepLungeY;
           if (Math.hypot(player.x - bx, player.y - by) < this.baseRadius + player.radius + 15) {
             this.orbitalSweepParried = true;
-            super.takeDamage(18);
+            super.takeDamage(5);
             audio.playBossExplode();
             screenShake.trigger(35, 0.5);
             particles.spawnExplosion(bx, by, '#ffffff', 45, 10);
@@ -704,7 +714,7 @@ export class Sigma extends Boss {
           const by = this.cy + this.gigaSlamLungeY;
           if (Math.hypot(player.x - bx, player.y - by) < this.baseRadius + player.radius + 20) {
             this.gigaSlamParried = true;
-            super.takeDamage(25); // Huge parry damage!
+            super.takeDamage(6); // Parry damage
             audio.playBossExplode();
             screenShake.trigger(45, 0.6);
             particles.spawnExplosion(bx, by, '#ffffff', 50, 12);

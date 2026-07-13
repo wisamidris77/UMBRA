@@ -55,8 +55,8 @@ export class CrystalTitan extends Boss {
     
     this.finalSequence = [];
     
-    this.maxHp = 120;
-    this.hp = 120;
+    this.maxHp = 220;
+    this.hp = 220;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -93,8 +93,8 @@ export class CrystalTitan extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 30) { // 25% of 120 maxHp
-      this.triggerPhaseTransition(2, 80); // Phase 2 has 80 HP (quick, fun!)
+    if (this.phase === 1 && this.hp <= 55) { // 25% of 220 maxHp
+      this.triggerPhaseTransition(2, 140); // Phase 2 has 140 HP (quick, fun!)
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
       this.color = '#ffcc00'; // Core color changes to gold!

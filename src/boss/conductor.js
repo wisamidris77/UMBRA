@@ -59,8 +59,8 @@ export class ClockworkConductor extends Boss {
     
     this.finalSequence = [];
     
-    this.maxHp = 140;
-    this.hp = 140;
+    this.maxHp = 260;
+    this.hp = 260;
     
     this.activeSequence = this.phase1Sequence;
     this.targetAttack = 'IDLE';
@@ -94,13 +94,13 @@ export class ClockworkConductor extends Boss {
   }
 
   checkPhaseTransitions() {
-    if (this.phase === 1 && this.hp <= 46) { // 33% of 140
-      this.triggerPhaseTransition(2, 120); // Phase 2 has 120 HP
+    if (this.phase === 1 && this.hp <= 86) { // 33% of 260
+      this.triggerPhaseTransition(2, 220); // Phase 2 has 220 HP
       this.activeSequence = this.phase2Sequence;
       this.sequenceIndex = 0;
       this.color = '#39ff14'; // Color shifts to electric green!
-    } else if (this.phase === 2 && this.hp <= 36) { // 30% of 120
-      this.triggerPhaseTransition(3, 180); // Phase 3 has 180 HP
+    } else if (this.phase === 2 && this.hp <= 66) { // 30% of 220
+      this.triggerPhaseTransition(3, 320); // Phase 3 has 320 HP
       this.activeSequence = this.phase3Sequence;
       this.sequenceIndex = 0;
       this.color = '#ff0055'; // Color shifts to warning neon crimson!
