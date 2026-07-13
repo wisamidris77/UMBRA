@@ -1219,7 +1219,7 @@ class GameApp {
                 this.renderDialogueLine('entity-b', "NO I DON'T", () => {
                   audio.playClickSFX();
                   setTimeout(() => {
-                    this.renderDialogueLine('entity-a', "Guess you are not carious about the story?", () => {
+                    this.renderDialogueLine('entity-a', "Guess you are not curious about the story?", () => {
                       setTimeout(() => {
                         this.showDialogueChoices([
                           {

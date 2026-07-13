@@ -128,6 +128,7 @@ export class Player {
     this.trail = [];
     this.updatePosition();
     this.updateHeartsUI();
+    audio.stopCharge();
   }
 
   updatePosition() {
@@ -187,6 +188,7 @@ export class Player {
     
     if (this.hp <= 0) {
       this.state = 'DEAD';
+      audio.stopCharge();
       particles.spawnExplosion(this.x, this.y, '#ff0055', 30, 8);
     }
   }
